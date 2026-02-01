@@ -251,23 +251,36 @@ main {
 
 .editor-canvas {
   min-height: 420px;
+}
+
+.editor-page .trumbowyg-box {
   background: #0f1117;
   border: 1px dashed var(--border);
   border-radius: 12px;
+  overflow: hidden;
+}
+
+.editor-page .trumbowyg-editor {
+  min-height: 380px;
   padding: 20px;
+  background: #0f1117;
   color: var(--text);
 }
 
-.editor-canvas .ProseMirror {
-  min-height: 380px;
-  outline: none;
+.editor-page .trumbowyg-toolbar {
+  background: #11141b;
+  border-bottom: 1px solid var(--border);
 }
 
-.editor-canvas .ProseMirror > * + * {
+.editor-page .trumbowyg-button-pane button {
+  color: var(--text);
+}
+
+.editor-page .trumbowyg-editor > * + * {
   margin-top: 0.75rem;
 }
 
-.editor-page .editor-canvas img {
+.editor-page .trumbowyg-editor img {
   max-width: 100%;
   border-radius: 8px;
   cursor: grab;

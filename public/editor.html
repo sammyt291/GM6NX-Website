@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GM6NX Editor</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/ui/trumbowyg.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/plugins/colors/ui/trumbowyg.colors.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/plugins/fontfamily/ui/trumbowyg.fontfamily.min.css" />
   </head>
   <body class="editor-page">
     <header>
@@ -23,35 +26,6 @@
           <span class="toolbar-label">Pages</span>
           <button id="newPageBtn" class="secondary">New page</button>
           <button id="savePageBtn">Save page</button>
-        </div>
-        <div class="toolbar-group">
-          <span class="toolbar-label">Modifiers</span>
-          <button data-command="bold" class="secondary">Bold</button>
-          <button data-command="italic" class="secondary">Italic</button>
-          <button data-command="underline" class="secondary">Underline</button>
-          <button id="resetFormatBtn" class="secondary">Reset format</button>
-        </div>
-        <div class="toolbar-group">
-          <span class="toolbar-label">Alignment</span>
-          <button data-command="justifyLeft" class="secondary">Left</button>
-          <button data-command="justifyCenter" class="secondary">Center</button>
-          <button data-command="justifyRight" class="secondary">Right</button>
-        </div>
-        <div class="toolbar-group">
-          <span class="toolbar-label">Typography</span>
-          <select id="fontSelect" class="secondary">
-            <option value="Arial">Arial</option>
-            <option value="Georgia">Georgia</option>
-            <option value="Times New Roman">Times New Roman</option>
-            <option value="Verdana">Verdana</option>
-          </select>
-          <select id="sizeSelect" class="secondary">
-            <option value="1">Small</option>
-            <option value="3" selected>Normal</option>
-            <option value="5">Large</option>
-            <option value="7">Hero</option>
-          </select>
-          <input type="color" id="colorPicker" value="#f5f7ff" />
         </div>
         <div class="toolbar-group">
           <span class="toolbar-label">Media</span>
@@ -78,6 +52,11 @@
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="/editor.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/trumbowyg.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/plugins/colors/trumbowyg.colors.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/plugins/fontfamily/trumbowyg.fontfamily.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/trumbowyg@2.27.3/dist/plugins/resizimg/trumbowyg.resizimg.min.js"></script>
+    <script src="/editor.js"></script>
   </body>
 </html>
