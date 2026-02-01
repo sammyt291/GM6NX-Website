@@ -507,6 +507,12 @@ function cancelFormatPainter() {
   editor.classList.remove('format-mode');
 }
 
+function getClosestTarget(event, selector) {
+  const target = event.target;
+  if (!(target instanceof Element)) return null;
+  return target.closest(selector);
+}
+
 async function handleImageDrop(event) {
   const files = Array.from(event.dataTransfer.files || []);
   if (!files.length) return;
@@ -665,7 +671,7 @@ editor.addEventListener('click', (event) => {
   if (formatMode) {
     event.preventDefault();
     event.stopPropagation();
-    const source = event.target.closest('*');
+    const source = getClosestTarget(event, '*');
     if (source && editor.contains(source)) {
       const styles = window.getComputedStyle(source);
       applyFormattingToRange(formatTargetRange, styles);
@@ -673,13 +679,13 @@ editor.addEventListener('click', (event) => {
     cancelFormatPainter();
     return;
   }
-  const imageBlock = event.target.closest('.image-block');
+  const imageBlock = getClosestTarget(event, '.image-block');
   if (imageBlock && editor.contains(imageBlock)) {
     setSelectedImageBlock(imageBlock);
   } else {
     setSelectedImageBlock(null);
   }
-  const group = event.target.closest('.grid-group');
+  const group = getClosestTarget(event, '.grid-group');
   if (group) {
     setSelectedGroup(group);
   } else {
@@ -694,15 +700,15 @@ editor.addEventListener('focus', () => {
 });
 
 editor.addEventListener('dragstart', (event) => {
-  if (event.target.closest('img')) return;
-  const cell = event.target.closest('.grid-cell');
+  if (getClosestTarget(event, 'img')) return;
+  const cell = getClosestTarget(event, '.grid-cell');
   if (!cell) return;
   draggingCell = cell;
   event.dataTransfer.effectAllowed = 'move';
 });
 
 editor.addEventListener('dragstart', (event) => {
-  const image = event.target.closest('img');
+  const image = getClosestTarget(event, 'img');
   if (!image || !editor.contains(image)) return;
   if (image.closest('.html-widget')) return;
   draggingImage = image.closest('.image-block') || image;
@@ -723,7 +729,7 @@ editor.addEventListener('dragover', (event) => {
   if (draggingImage) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    const cell = event.target.closest('.grid-cell');
+    const cell = getClosestTarget(event, '.grid-cell');
     if (!cell) {
       const range = getDropRange(event);
       updateImageDropMarker(range);
@@ -736,7 +742,7 @@ editor.addEventListener('dragover', (event) => {
     event.preventDefault();
     return;
   }
-  let cell = event.target.closest('.grid-cell');
+  let cell = getClosestTarget(event, '.grid-cell');
   if (cell && draggingCell) {
     event.preventDefault();
     const rect = cell.getBoundingClientRect();
@@ -748,7 +754,7 @@ editor.addEventListener('dragover', (event) => {
     dropTarget = null;
     dropPosition = null;
   }
-  const group = event.target.closest('.grid-group');
+  const group = getClosestTarget(event, '.grid-group');
   if (group && draggingCell) {
     document.querySelectorAll('.grid-group.drag-target').forEach((activeGroup) => {
       if (activeGroup !== group) activeGroup.classList.remove('drag-target');
@@ -764,11 +770,11 @@ editor.addEventListener('dragover', (event) => {
 });
 
 editor.addEventListener('dragleave', (event) => {
-  const cell = event.target.closest('.grid-cell');
+  const cell = getClosestTarget(event, '.grid-cell');
   if (cell) {
     cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
   }
-  const group = event.target.closest('.grid-group');
+  const group = getClosestTarget(event, '.grid-group');
   if (group) {
     group.classList.remove('drag-target');
   }
@@ -778,7 +784,7 @@ editor.addEventListener('dragleave', (event) => {
 editor.addEventListener('drop', async (event) => {
   if (draggingImage) {
     event.preventDefault();
-    const cell = event.target.closest('.grid-cell');
+    const cell = getClosestTarget(event, '.grid-cell');
     if (cell) {
       cell.appendChild(draggingImage);
     } else {
@@ -797,11 +803,11 @@ editor.addEventListener('drop', async (event) => {
     draggingImage = null;
     return;
   }
-  const cell = event.target.closest('.grid-cell');
+  const cell = getClosestTarget(event, '.grid-cell');
   if (cell) {
     cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
   }
-  const dropGroup = event.target.closest('.grid-group');
+  const dropGroup = getClosestTarget(event, '.grid-group');
   if (draggingCell && dropGroup) {
     event.preventDefault();
     if (cell && draggingCell !== cell) {
