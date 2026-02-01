@@ -33,9 +33,9 @@ let formatTargetRange = null;
 const defaultTextColor = '#f5f7ff';
 let activeColor = colorPicker?.value || defaultTextColor;
 let selectedImageBlock = null;
-let groupDropPreview = null;
-let groupDropPreviewGroup = null;
-let groupDropPreviewPosition = null;
+let groupDropMarker = null;
+let groupDropMarkerGroup = null;
+let groupDropTarget = null;
 
 async function ensureSession() {
   const res = await fetch('/api/session');
@@ -264,46 +264,33 @@ function clearDropIndicator() {
   document.querySelectorAll('.grid-group.drag-target').forEach((group) => {
     group.classList.remove('drag-target');
   });
+  clearGroupDropMarker();
 }
 
-function clearGroupDropPreview() {
-  if (groupDropPreview) {
-    groupDropPreview.remove();
-    groupDropPreview = null;
+function clearGroupDropMarker() {
+  if (groupDropMarker) {
+    groupDropMarker.remove();
+    groupDropMarker = null;
   }
-  groupDropPreviewGroup = null;
-  groupDropPreviewPosition = null;
+  groupDropMarkerGroup = null;
+  groupDropTarget = null;
 }
 
-function createGroupDropPreview() {
-  const preview = document.createElement('div');
-  preview.className = 'grid-cell drop-preview';
-  preview.textContent = 'New widget';
-  preview.contentEditable = false;
-  preview.draggable = false;
-  return preview;
+function createGroupDropMarker() {
+  const marker = document.createElement('div');
+  marker.className = 'group-drop-marker';
+  return marker;
 }
 
-function updateGroupDropPreview(group, cell, position) {
+function updateGroupDropMarker(group) {
   if (!group) return;
-  const preview = groupDropPreview || createGroupDropPreview();
-  if (groupDropPreview && groupDropPreviewGroup === group && groupDropPreviewPosition === position && cell === dropTarget) {
-    return;
-  }
-  preview.classList.remove('drop-preview-before', 'drop-preview-after');
-  preview.classList.add(position === 'before' ? 'drop-preview-before' : 'drop-preview-after');
-  if (cell) {
-    if (position === 'before') {
-      group.insertBefore(preview, cell);
-    } else {
-      group.insertBefore(preview, cell.nextSibling);
-    }
-  } else {
-    group.appendChild(preview);
-  }
-  groupDropPreview = preview;
-  groupDropPreviewGroup = group;
-  groupDropPreviewPosition = position;
+  if (groupDropMarker && groupDropMarkerGroup === group) return;
+  clearGroupDropMarker();
+  const marker = createGroupDropMarker();
+  group.appendChild(marker);
+  groupDropMarker = marker;
+  groupDropMarkerGroup = group;
+  groupDropTarget = group;
 }
 
 function clearImageDropMarker() {
@@ -347,6 +334,49 @@ function updateDropIndicator(cell, position) {
     cell.classList.add('drag-over-after');
     cell.classList.remove('drag-over-before');
   }
+}
+
+function isTextOnlyCell(cell) {
+  if (!cell) return false;
+  return !cell.querySelector('img, .image-block, .html-widget');
+}
+
+function extractDragContentFromCell(cell) {
+  if (!cell) return null;
+  const imageBlock = cell.querySelector('.image-block');
+  if (imageBlock && cell.childNodes.length === 1) {
+    return imageBlock;
+  }
+  const widget = cell.querySelector('.html-widget');
+  if (widget && cell.childNodes.length === 1) {
+    return widget;
+  }
+  if (isTextOnlyCell(cell)) {
+    return document.createTextNode(cell.textContent || '');
+  }
+  const wrapper = document.createElement('div');
+  wrapper.contentEditable = true;
+  while (cell.firstChild) {
+    wrapper.appendChild(cell.firstChild);
+  }
+  return wrapper;
+}
+
+function insertDraggedContentIntoEditor(content, range) {
+  if (!content) return;
+  if (!range) {
+    editor.appendChild(content);
+    return;
+  }
+  const isTextNode = content.nodeType === Node.TEXT_NODE;
+  if (!isTextNode && range.startContainer.nodeType === Node.TEXT_NODE) {
+    const parent = range.startContainer.parentElement;
+    if (parent && editor.contains(parent)) {
+      parent.after(content);
+      return;
+    }
+  }
+  range.insertNode(content);
 }
 
 function positionGroupControls() {
@@ -684,7 +714,7 @@ editor.addEventListener('dragstart', (event) => {
 editor.addEventListener('dragend', () => {
   clearDropIndicator();
   clearImageDropMarker();
-  clearGroupDropPreview();
+  clearGroupDropMarker();
   draggingCell = null;
   draggingImage = null;
 });
@@ -707,18 +737,16 @@ editor.addEventListener('dragover', (event) => {
     return;
   }
   let cell = event.target.closest('.grid-cell');
-  if (cell && cell.classList.contains('drop-preview')) {
-    cell = null;
-  }
   if (cell && draggingCell) {
     event.preventDefault();
     const rect = cell.getBoundingClientRect();
     const position = event.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
     updateDropIndicator(cell, position);
-    const group = cell.closest('.grid-group');
-    if (group) {
-      updateGroupDropPreview(group, cell, position);
-    }
+    clearGroupDropMarker();
+  } else if (draggingCell && dropTarget) {
+    dropTarget.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+    dropTarget = null;
+    dropPosition = null;
   }
   const group = event.target.closest('.grid-group');
   if (group && draggingCell) {
@@ -728,8 +756,10 @@ editor.addEventListener('dragover', (event) => {
     group.classList.add('drag-target');
     if (!cell) {
       event.preventDefault();
-      updateGroupDropPreview(group, null, 'after');
+      updateGroupDropMarker(group);
     }
+  } else {
+    clearGroupDropMarker();
   }
 });
 
@@ -742,6 +772,7 @@ editor.addEventListener('dragleave', (event) => {
   if (group) {
     group.classList.remove('drag-target');
   }
+  clearGroupDropMarker();
 });
 
 editor.addEventListener('drop', async (event) => {
@@ -771,34 +802,37 @@ editor.addEventListener('drop', async (event) => {
     cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
   }
   const dropGroup = event.target.closest('.grid-group');
-  if (draggingCell && groupDropPreview && dropGroup && dropGroup === groupDropPreviewGroup) {
+  if (draggingCell && dropGroup) {
     event.preventDefault();
-    groupDropPreview.replaceWith(draggingCell);
-    clearGroupDropPreview();
+    if (cell && draggingCell !== cell) {
+      if (dropPosition === 'before') {
+        dropGroup.insertBefore(draggingCell, cell);
+      } else {
+        const referenceNode = cell.nextSibling;
+        dropGroup.insertBefore(draggingCell, referenceNode);
+      }
+    } else if (groupDropTarget === dropGroup) {
+      dropGroup.appendChild(draggingCell);
+    }
     clearDropIndicator();
+    clearGroupDropMarker();
     draggingCell = null;
     return;
   }
-  if (draggingCell && cell && draggingCell !== cell) {
+  if (draggingCell && !dropGroup) {
     event.preventDefault();
-    const parent = cell.parentElement;
-    const draggingParent = draggingCell.parentElement;
-    if (parent && parent === draggingParent) {
-      if (dropPosition === 'before') {
-        parent.insertBefore(draggingCell, cell);
-      } else {
-        const referenceNode = cell.nextSibling;
-        parent.insertBefore(draggingCell, referenceNode);
-      }
-    }
+    const range = getDropRange(event);
+    const extracted = extractDragContentFromCell(draggingCell);
+    insertDraggedContentIntoEditor(extracted, range);
+    draggingCell.remove();
     clearDropIndicator();
-    clearGroupDropPreview();
+    clearGroupDropMarker();
     draggingCell = null;
     return;
   }
   await handleImageDrop(event);
   clearDropIndicator();
-  clearGroupDropPreview();
+  clearGroupDropMarker();
   draggingCell = null;
 });
 
