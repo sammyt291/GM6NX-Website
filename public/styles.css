@@ -479,6 +479,7 @@ main {
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(95, 227, 182, 0.35), rgba(124, 92, 255, 0.4));
   animation: drop-gap 0.7s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .image-block {
