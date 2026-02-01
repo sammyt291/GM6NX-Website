@@ -15,13 +15,18 @@ const groupControls = document.getElementById('groupControls');
 const groupRowsInput = document.getElementById('groupRowsInput');
 const groupColsInput = document.getElementById('groupColsInput');
 const logoutBtn = document.getElementById('logoutBtn');
+const toast = document.getElementById('toast');
 
 let pages = [];
 let navItems = [];
 let currentSlug = null;
 let selectedGroup = null;
 let draggingCell = null;
-let activeColor = colorPicker?.value || '#ffffff';
+let dropTarget = null;
+let dropPosition = null;
+let toastTimeout = null;
+const defaultTextColor = '#f5f7ff';
+let activeColor = colorPicker?.value || defaultTextColor;
 
 async function ensureSession() {
   const res = await fetch('/api/session');
@@ -72,18 +77,33 @@ function execCommand(command, value = null) {
 
 function setActiveColor(color) {
   activeColor = color;
-  editor.style.color = activeColor;
   execCommand('foreColor', activeColor);
+}
+
+function showToast(message) {
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  if (toastTimeout) {
+    window.clearTimeout(toastTimeout);
+  }
+  toastTimeout = window.setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2400);
 }
 
 async function savePage() {
   if (!currentSlug) return;
-  await fetch(`/api/pages/${currentSlug}`, {
+  const res = await fetch(`/api/pages/${currentSlug}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content: editor.innerHTML }),
   });
-  alert('Saved!');
+  if (!res.ok) {
+    showToast('Save failed. Try again.');
+    return;
+  }
+  showToast('Page saved.');
 }
 
 async function createPageAt(parentItems, insertIndex, asChild = false, initialTitle = '') {
@@ -228,6 +248,34 @@ function addWidget(type) {
   }
   cell.draggable = true;
   selectedGroup.appendChild(cell);
+}
+
+function clearDropIndicator() {
+  if (dropTarget) {
+    dropTarget.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+    dropTarget = null;
+    dropPosition = null;
+  }
+  document.querySelectorAll('.grid-group.drag-target').forEach((group) => {
+    group.classList.remove('drag-target');
+  });
+}
+
+function updateDropIndicator(cell, position) {
+  if (!cell) return;
+  if (dropTarget && dropTarget !== cell) {
+    dropTarget.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+  }
+  dropTarget = cell;
+  dropPosition = position;
+  cell.classList.add('drag-over');
+  if (position === 'before') {
+    cell.classList.add('drag-over-before');
+    cell.classList.remove('drag-over-after');
+  } else {
+    cell.classList.add('drag-over-after');
+    cell.classList.remove('drag-over-before');
+  }
 }
 
 function positionGroupControls() {
@@ -387,9 +435,7 @@ editor.addEventListener('dragstart', (event) => {
 });
 
 editor.addEventListener('dragend', () => {
-  document.querySelectorAll('.grid-cell.drag-over').forEach((cell) => {
-    cell.classList.remove('drag-over');
-  });
+  clearDropIndicator();
   draggingCell = null;
 });
 
@@ -401,34 +447,53 @@ editor.addEventListener('dragover', (event) => {
   const cell = event.target.closest('.grid-cell');
   if (cell && draggingCell) {
     event.preventDefault();
-    cell.classList.add('drag-over');
+    const rect = cell.getBoundingClientRect();
+    const position = event.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+    updateDropIndicator(cell, position);
+  }
+  const group = event.target.closest('.grid-group');
+  if (group && draggingCell) {
+    document.querySelectorAll('.grid-group.drag-target').forEach((activeGroup) => {
+      if (activeGroup !== group) activeGroup.classList.remove('drag-target');
+    });
+    group.classList.add('drag-target');
   }
 });
 
 editor.addEventListener('dragleave', (event) => {
   const cell = event.target.closest('.grid-cell');
   if (cell) {
-    cell.classList.remove('drag-over');
+    cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+  }
+  const group = event.target.closest('.grid-group');
+  if (group) {
+    group.classList.remove('drag-target');
   }
 });
 
 editor.addEventListener('drop', async (event) => {
   const cell = event.target.closest('.grid-cell');
   if (cell) {
-    cell.classList.remove('drag-over');
+    cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
   }
   if (draggingCell && cell && draggingCell !== cell) {
     event.preventDefault();
     const parent = cell.parentElement;
     const draggingParent = draggingCell.parentElement;
     if (parent && parent === draggingParent) {
-      const referenceNode = cell.nextSibling;
-      parent.insertBefore(draggingCell, referenceNode);
+      if (dropPosition === 'before') {
+        parent.insertBefore(draggingCell, cell);
+      } else {
+        const referenceNode = cell.nextSibling;
+        parent.insertBefore(draggingCell, referenceNode);
+      }
     }
+    clearDropIndicator();
     draggingCell = null;
     return;
   }
   await handleImageDrop(event);
+  clearDropIndicator();
   draggingCell = null;
 });
 
@@ -469,6 +534,10 @@ document.querySelectorAll('[data-command]').forEach((btn) => {
 
 (async function init() {
   document.execCommand('styleWithCSS', false, true);
+  if (colorPicker) {
+    colorPicker.value = defaultTextColor;
+    activeColor = defaultTextColor;
+  }
   await ensureSession();
   await loadPages();
   setActiveColor(activeColor);
