@@ -94,10 +94,24 @@ async function loadPage(slug, fallbackTitle) {
     const data = await res.json();
     pageTitle.textContent = data.page.title || fallbackTitle || 'GM6NX';
     pageContent.innerHTML = data.page.content || '<p>Empty page.</p>';
+    disableGroupEditing();
   } catch {
     pageTitle.textContent = fallbackTitle || 'GM6NX';
     pageContent.innerHTML = '<p>Unable to load page content.</p>';
   }
+}
+
+function disableGroupEditing() {
+  const groups = pageContent.querySelectorAll('.grid-group');
+  groups.forEach((group) => {
+    group.removeAttribute('contenteditable');
+    group.querySelectorAll('[contenteditable]').forEach((node) => {
+      node.removeAttribute('contenteditable');
+    });
+    group.querySelectorAll('[draggable]').forEach((node) => {
+      node.removeAttribute('draggable');
+    });
+  });
 }
 
 function openModal(modal) {
