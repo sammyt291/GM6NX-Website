@@ -1,20 +1,7 @@
-import { Editor, Extension } from 'https://esm.sh/@tiptap/core';
-import StarterKit from 'https://esm.sh/@tiptap/starter-kit';
-import Underline from 'https://esm.sh/@tiptap/extension-underline';
-import TextAlign from 'https://esm.sh/@tiptap/extension-text-align';
-import { TextStyle } from 'https://esm.sh/@tiptap/extension-text-style';
-import Color from 'https://esm.sh/@tiptap/extension-color';
-import FontFamily from 'https://esm.sh/@tiptap/extension-font-family';
-import Image from 'https://esm.sh/@tiptap/extension-image';
-
 const editorElement = document.getElementById('editor');
 const siteMap = document.getElementById('siteMap');
 const newPageBtn = document.getElementById('newPageBtn');
 const savePageBtn = document.getElementById('savePageBtn');
-const fontSelect = document.getElementById('fontSelect');
-const sizeSelect = document.getElementById('sizeSelect');
-const colorPicker = document.getElementById('colorPicker');
-const resetFormatBtn = document.getElementById('resetFormatBtn');
 const imageInput = document.getElementById('imageInput');
 const logoutBtn = document.getElementById('logoutBtn');
 const toast = document.getElementById('toast');
@@ -23,67 +10,33 @@ let pages = [];
 let navItems = [];
 let currentSlug = null;
 let toastTimeout = null;
+let trumbowygInstance = null;
 
-const FontSize = Extension.create({
-  name: 'fontSize',
-  addGlobalAttributes() {
-    return [
-      {
-        types: ['textStyle'],
-        attributes: {
-          fontSize: {
-            default: null,
-            parseHTML: (element) => element.style.fontSize || null,
-            renderHTML: (attributes) => {
-              if (!attributes.fontSize) return {};
-              return { style: `font-size: ${attributes.fontSize}` };
-            },
-          },
-        },
+const fontFamilies = ['Arial', 'Georgia', 'Times New Roman', 'Verdana'];
+
+function initEditor() {
+  if (!editorElement || !window.jQuery) return;
+  trumbowygInstance = window.jQuery(editorElement);
+  trumbowygInstance.trumbowyg({
+    btns: [
+      ['strong', 'em', 'underline'],
+      ['justifyLeft', 'justifyCenter', 'justifyRight'],
+      ['foreColor', 'backColor'],
+      ['fontfamily'],
+      ['insertImage'],
+      ['removeformat'],
+      ['viewHTML'],
+    ],
+    plugins: {
+      fontfamily: {
+        fontList: fontFamilies,
       },
-    ];
-  },
-  addCommands() {
-    return {
-      setFontSize:
-        (size) =>
-        ({ chain }) =>
-          chain().setMark('textStyle', { fontSize: size }).run(),
-      unsetFontSize:
-        () =>
-        ({ chain }) =>
-          chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
-    };
-  },
-});
-
-const tiptapEditor = new Editor({
-  element: editorElement,
-  extensions: [
-    StarterKit,
-    Underline,
-    TextStyle,
-    Color,
-    FontFamily,
-    FontSize,
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Image.configure({ inline: false, allowBase64: false }),
-  ],
-  content: '',
-  editorProps: {
-    attributes: {
-      class: 'tiptap-editor',
-      'aria-label': 'Page content editor',
     },
-  },
-});
-
-const fontSizeMap = {
-  1: '12px',
-  3: '16px',
-  5: '24px',
-  7: '32px',
-};
+    autogrow: true,
+    removeformatPasted: true,
+    semantic: true,
+  });
+}
 
 async function ensureSession() {
   const res = await fetch('/api/session');
@@ -123,7 +76,9 @@ async function loadPage(slug) {
   const res = await fetch(`/api/pages/${slug}`);
   if (!res.ok) return;
   const data = await res.json();
-  tiptapEditor.commands.setContent(data.page.content || '', false);
+  if (trumbowygInstance) {
+    trumbowygInstance.trumbowyg('html', data.page.content || '');
+  }
   currentSlug = slug;
 }
 
@@ -140,11 +95,11 @@ function showToast(message) {
 }
 
 async function savePage() {
-  if (!currentSlug) return;
+  if (!currentSlug || !trumbowygInstance) return;
   const res = await fetch(`/api/pages/${currentSlug}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content: tiptapEditor.getHTML() }),
+    body: JSON.stringify({ content: trumbowygInstance.trumbowyg('html') }),
   });
   if (!res.ok) {
     showToast('Save failed. Try again.');
@@ -181,7 +136,8 @@ async function createPageAt(parentItems, insertIndex, asChild = false, initialTi
 }
 
 function insertImage(url) {
-  tiptapEditor.chain().focus().setImage({ src: url }).run();
+  if (!trumbowygInstance) return;
+  trumbowygInstance.trumbowyg('execCmd', { cmd: 'insertImage', param: url });
 }
 
 async function uploadImage(file) {
@@ -292,31 +248,6 @@ function createSiteMapActions(parentItems, index, item = null) {
   return actions;
 }
 
-function handleToolbarCommand(command) {
-  switch (command) {
-    case 'bold':
-      tiptapEditor.chain().focus().toggleBold().run();
-      break;
-    case 'italic':
-      tiptapEditor.chain().focus().toggleItalic().run();
-      break;
-    case 'underline':
-      tiptapEditor.chain().focus().toggleUnderline().run();
-      break;
-    case 'justifyLeft':
-      tiptapEditor.chain().focus().setTextAlign('left').run();
-      break;
-    case 'justifyCenter':
-      tiptapEditor.chain().focus().setTextAlign('center').run();
-      break;
-    case 'justifyRight':
-      tiptapEditor.chain().focus().setTextAlign('right').run();
-      break;
-    default:
-      break;
-  }
-}
-
 function handleImageDrop(event) {
   const files = Array.from(event.dataTransfer.files || []);
   if (!files.length) return;
@@ -328,23 +259,6 @@ function handleImageDrop(event) {
 
 newPageBtn.addEventListener('click', () => createPageAt(navItems, navItems.length - 1));
 savePageBtn.addEventListener('click', savePage);
-
-fontSelect.addEventListener('change', (event) => {
-  tiptapEditor.chain().focus().setFontFamily(event.target.value).run();
-});
-
-sizeSelect.addEventListener('change', (event) => {
-  const size = fontSizeMap[event.target.value] || `${event.target.value}px`;
-  tiptapEditor.chain().focus().setFontSize(size).run();
-});
-
-colorPicker.addEventListener('change', (event) => {
-  tiptapEditor.chain().focus().setColor(event.target.value).run();
-});
-
-resetFormatBtn.addEventListener('click', () => {
-  tiptapEditor.chain().focus().unsetAllMarks().clearNodes().run();
-});
 
 imageInput.addEventListener('change', (event) => {
   const file = event.target.files[0];
@@ -359,25 +273,15 @@ logoutBtn.addEventListener('click', async () => {
   window.location.href = '/';
 });
 
-document.querySelectorAll('[data-command]').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const command = btn.dataset.command;
-    handleToolbarCommand(command);
-  });
-});
-
-const editorDom = tiptapEditor.view.dom;
-editorDom.addEventListener('drop', handleImageDrop);
-editorDom.addEventListener('dragover', (event) => {
+editorElement.addEventListener('drop', handleImageDrop);
+editorElement.addEventListener('dragover', (event) => {
   if (event.dataTransfer.types && event.dataTransfer.types.includes('Files')) {
     event.preventDefault();
   }
 });
 
 (async function init() {
-  if (colorPicker) {
-    colorPicker.value = '#f5f7ff';
-  }
+  initEditor();
   await ensureSession();
   await loadPages();
 })();
