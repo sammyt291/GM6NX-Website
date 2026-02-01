@@ -19,49 +19,81 @@
     <main>
       <h1>Page editor</h1>
       <div class="toolbar">
-        <select id="pageSelect"></select>
-        <button id="newPageBtn" class="secondary">New page</button>
-        <button id="savePageBtn">Save page</button>
-        <button data-command="bold" class="secondary">Bold</button>
-        <button data-command="italic" class="secondary">Italic</button>
-        <button data-command="underline" class="secondary">Underline</button>
-        <button data-command="justifyLeft" class="secondary">Left</button>
-        <button data-command="justifyCenter" class="secondary">Center</button>
-        <button data-command="justifyRight" class="secondary">Right</button>
-        <select id="fontSelect" class="secondary">
-          <option value="Arial">Arial</option>
-          <option value="Georgia">Georgia</option>
-          <option value="Times New Roman">Times New Roman</option>
-          <option value="Verdana">Verdana</option>
-        </select>
-        <select id="sizeSelect" class="secondary">
-          <option value="1">Small</option>
-          <option value="3" selected>Normal</option>
-          <option value="5">Large</option>
-          <option value="7">Hero</option>
-        </select>
-        <input type="color" id="colorPicker" />
-        <label class="button secondary">
-          Upload image
-          <input type="file" id="imageInput" accept="image/*" hidden />
-        </label>
-        <button id="addGroupBtn" class="secondary">Add group</button>
+        <div class="toolbar-group">
+          <span class="toolbar-label">Pages</span>
+          <button id="newPageBtn" class="secondary">New page</button>
+          <button id="savePageBtn">Save page</button>
+        </div>
+        <div class="toolbar-group">
+          <span class="toolbar-label">Modifiers</span>
+          <button data-command="bold" class="secondary">Bold</button>
+          <button data-command="italic" class="secondary">Italic</button>
+          <button data-command="underline" class="secondary">Underline</button>
+          <button id="resetFormatBtn" class="secondary">Reset format</button>
+        </div>
+        <div class="toolbar-group">
+          <span class="toolbar-label">Alignment</span>
+          <button data-command="justifyLeft" class="secondary">Left</button>
+          <button data-command="justifyCenter" class="secondary">Center</button>
+          <button data-command="justifyRight" class="secondary">Right</button>
+        </div>
+        <div class="toolbar-group">
+          <span class="toolbar-label">Typography</span>
+          <select id="fontSelect" class="secondary">
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+          <select id="sizeSelect" class="secondary">
+            <option value="1">Small</option>
+            <option value="3" selected>Normal</option>
+            <option value="5">Large</option>
+            <option value="7">Hero</option>
+          </select>
+          <input type="color" id="colorPicker" />
+        </div>
+        <div class="toolbar-group">
+          <span class="toolbar-label">Media</span>
+          <label class="button secondary">
+            Upload image
+            <input type="file" id="imageInput" accept="image/*" hidden />
+          </label>
+          <button id="addGroupBtn" class="secondary">Add group</button>
+        </div>
       </div>
 
       <div class="editor-layout">
-        <div>
-          <div id="editor" class="editor-canvas" contenteditable="true"></div>
-          <p class="notice">Tip: drag images within the editor to reposition between text lines.</p>
-        </div>
-        <aside class="sidebar">
-          <h3>Group controls</h3>
-          <p class="notice">Select a group to adjust its grid and add widgets.</p>
-          <button id="addRowBtn" class="secondary">Add row</button>
-          <button id="addColBtn" class="secondary">Add column</button>
-          <button id="addTextWidget" class="secondary">Add text widget</button>
-          <button id="addImageWidget" class="secondary">Add image widget</button>
-          <button id="addHtmlWidget" class="secondary">Add HTML widget</button>
+        <aside class="sidebar sitemap">
+          <h3>Site map</h3>
+          <p class="notice">Select pages in navigation order or add dividers.</p>
+          <div id="siteMap" class="site-map"></div>
         </aside>
+        <div class="editor-workspace">
+          <div class="editor-wrapper">
+            <div id="editor" class="editor-canvas" contenteditable="true"></div>
+            <div id="groupControls" class="group-controls" aria-hidden="true">
+              <div class="group-controls-header">
+                <strong>Group controls</strong>
+                <span class="group-controls-subtitle">Selected grid settings</span>
+              </div>
+              <label class="group-input">
+                Rows
+                <input type="number" id="groupRowsInput" min="1" value="1" />
+              </label>
+              <label class="group-input">
+                Columns
+                <input type="number" id="groupColsInput" min="1" value="1" />
+              </label>
+              <div class="group-widget-buttons">
+                <button id="addTextWidget" class="secondary">Add text widget</button>
+                <button id="addImageWidget" class="secondary">Add image widget</button>
+                <button id="addHtmlWidget" class="secondary">Add HTML widget</button>
+              </div>
+            </div>
+          </div>
+          <p class="notice">Tip: drop images directly onto the canvas to position them.</p>
+        </div>
       </div>
     </main>
 
