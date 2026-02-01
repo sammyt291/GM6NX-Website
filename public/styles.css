@@ -583,6 +583,11 @@ main {
   height: auto;
 }
 
+.page-content img {
+  max-width: 100%;
+  height: auto;
+}
+
 .editor-page .format-mode {
   cursor: copy;
 }

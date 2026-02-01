@@ -128,6 +128,10 @@ function normalizeContentImages(container) {
   images.forEach((img) => {
     if (img.closest('.html-widget')) return;
     img.removeAttribute('draggable');
+    const inlineContext = img.closest(
+      'p, span, a, strong, em, b, i, u, small, sup, sub, mark, code, s, del, ins, label'
+    );
+    if (inlineContext) return;
     if (!img.closest('.image-block')) {
       const block = createImageBlock(img);
       img.replaceWith(block);
