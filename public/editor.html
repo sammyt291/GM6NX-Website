@@ -29,7 +29,6 @@
           <button data-command="bold" class="secondary">Bold</button>
           <button data-command="italic" class="secondary">Italic</button>
           <button data-command="underline" class="secondary">Underline</button>
-          <button id="formatPainterBtn" class="secondary">Format</button>
           <button id="resetFormatBtn" class="secondary">Reset format</button>
         </div>
         <div class="toolbar-group">
@@ -60,7 +59,6 @@
             Upload image
             <input type="file" id="imageInput" accept="image/*" hidden />
           </label>
-          <button id="addGroupBtn" class="secondary">Add group</button>
         </div>
       </div>
 
@@ -72,25 +70,7 @@
         </aside>
         <div class="editor-workspace">
           <div class="editor-wrapper">
-            <div id="editor" class="editor-canvas" contenteditable="true"></div>
-            <div id="groupControls" class="group-controls" aria-hidden="true">
-              <div class="group-controls-header">
-                <strong>Group controls</strong>
-                <span class="group-controls-subtitle">Selected grid settings</span>
-              </div>
-              <label class="group-input">
-                Rows
-                <input type="number" id="groupRowsInput" min="1" value="1" />
-              </label>
-              <label class="group-input">
-                Columns
-                <input type="number" id="groupColsInput" min="1" value="1" />
-              </label>
-              <div class="group-widget-buttons">
-                <button id="addContentWidget" class="secondary">Add content widget</button>
-                <button id="addHtmlWidget" class="secondary">Add HTML widget</button>
-              </div>
-            </div>
+            <div id="editor" class="editor-canvas"></div>
           </div>
           <p class="notice">Tip: drop images directly onto the canvas to position them.</p>
         </div>
@@ -98,6 +78,6 @@
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="/editor.js"></script>
+    <script type="module" src="/editor.js"></script>
   </body>
 </html>
