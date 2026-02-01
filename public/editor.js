@@ -27,6 +27,7 @@ let draggingImage = null;
 let dropTarget = null;
 let dropPosition = null;
 let dropMarker = null;
+let lastImageDropRange = null;
 let toastTimeout = null;
 let formatMode = false;
 let formatTargetRange = null;
@@ -270,6 +271,7 @@ function clearImageDropMarker() {
     dropMarker.remove();
     dropMarker = null;
   }
+  lastImageDropRange = null;
 }
 
 function createDropMarker() {
@@ -280,9 +282,14 @@ function createDropMarker() {
 
 function updateImageDropMarker(range) {
   if (!range) return;
+  if (isRangeOnDropMarker(range)) return;
+  if (lastImageDropRange && range.startContainer === lastImageDropRange.container && range.startOffset === lastImageDropRange.offset) {
+    return;
+  }
   clearImageDropMarker();
   dropMarker = createDropMarker();
   range.insertNode(dropMarker);
+  lastImageDropRange = { container: range.startContainer, offset: range.startOffset };
 }
 
 function updateDropIndicator(cell, position) {
@@ -328,6 +335,20 @@ function getDropRange(event) {
     }
   }
   return null;
+}
+
+function isRangeOnDropMarker(range) {
+  if (!dropMarker || !range) return false;
+  const container = range.startContainer;
+  if (container === dropMarker || dropMarker.contains(container)) return true;
+  if (container.nodeType === Node.ELEMENT_NODE) {
+    const children = Array.from(container.childNodes);
+    const markerIndex = children.indexOf(dropMarker);
+    if (markerIndex !== -1) {
+      return range.startOffset === markerIndex || range.startOffset === markerIndex + 1;
+    }
+  }
+  return false;
 }
 
 function buildInlineStyleFromComputedStyles(styles) {
@@ -649,11 +670,15 @@ editor.addEventListener('drop', async (event) => {
     if (cell) {
       cell.appendChild(draggingImage);
     } else {
-      const range = getDropRange(event);
-      if (range) {
-        range.insertNode(draggingImage);
+      if (dropMarker && dropMarker.parentNode) {
+        dropMarker.parentNode.insertBefore(draggingImage, dropMarker);
       } else {
-        editor.appendChild(draggingImage);
+        const range = getDropRange(event);
+        if (range) {
+          range.insertNode(draggingImage);
+        } else {
+          editor.appendChild(draggingImage);
+        }
       }
     }
     clearImageDropMarker();
