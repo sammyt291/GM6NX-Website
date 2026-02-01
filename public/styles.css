@@ -473,6 +473,36 @@ main {
   bottom: -2px;
 }
 
+.editor-page .grid-cell.drop-preview {
+  background: rgba(95, 227, 182, 0.18);
+  border: 2px dashed rgba(95, 227, 182, 0.6);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  position: relative;
+}
+
+.editor-page .grid-cell.drop-preview::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+  background: var(--accent-2);
+  border-radius: 999px;
+  animation: drop-indicator 0.8s ease-in-out infinite;
+}
+
+.editor-page .grid-cell.drop-preview.drop-preview-before::after {
+  top: -2px;
+}
+
+.editor-page .grid-cell.drop-preview.drop-preview-after::after {
+  bottom: -2px;
+}
+
 .editor-page .image-drop-marker {
   height: 12px;
   margin: 6px 0;
@@ -485,6 +515,27 @@ main {
 .image-block {
   display: block;
   margin: 12px 0;
+}
+
+.image-block.is-selected {
+  outline: 2px solid rgba(95, 227, 182, 0.8);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.image-block[data-align='center'] {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.image-block[data-align='right'] {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.image-block[data-align='left'] {
+  margin-left: 0;
+  margin-right: auto;
 }
 
 .image-block img {
