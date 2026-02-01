@@ -433,6 +433,18 @@ main {
   animation: group-pulse 0.9s ease-in-out infinite;
 }
 
+.editor-page .group-drop-marker {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent-2);
+  animation: drop-indicator 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
 .grid-cell {
   min-height: 40px;
 }
