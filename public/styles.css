@@ -255,6 +255,7 @@ main {
   border: 1px dashed var(--border);
   border-radius: 12px;
   padding: 20px;
+  color: var(--text);
 }
 
 .editor-canvas img {
@@ -419,6 +420,14 @@ main {
   padding: 12px;
   margin: 12px 0;
   border-radius: 12px;
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.grid-group.drag-target {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 2px rgba(95, 227, 182, 0.35);
+  animation: group-pulse 0.9s ease-in-out infinite;
 }
 
 .grid-cell {
@@ -433,8 +442,28 @@ main {
 }
 
 .grid-cell.drag-over {
-  outline: 2px dashed var(--accent-2);
-  outline-offset: 2px;
+  outline: 2px dashed rgba(95, 227, 182, 0.5);
+  outline-offset: 4px;
+  position: relative;
+}
+
+.grid-cell.drag-over::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 3px;
+  background: var(--accent-2);
+  border-radius: 999px;
+  animation: drop-indicator 0.8s ease-in-out infinite;
+}
+
+.grid-cell.drag-over-before::after {
+  top: -2px;
+}
+
+.grid-cell.drag-over-after::after {
+  bottom: -2px;
 }
 
 .html-widget {
@@ -464,6 +493,51 @@ main {
 .notice {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  background: rgba(24, 27, 34, 0.95);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 30;
+  pointer-events: none;
+  font-weight: 600;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes drop-indicator {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scaleX(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes group-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(95, 227, 182, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(95, 227, 182, 0.45);
+  }
 }
 
 .table {
