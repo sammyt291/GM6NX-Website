@@ -2,7 +2,7 @@ import { Editor, Extension } from 'https://esm.sh/@tiptap/core';
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit';
 import Underline from 'https://esm.sh/@tiptap/extension-underline';
 import TextAlign from 'https://esm.sh/@tiptap/extension-text-align';
-import TextStyle from 'https://esm.sh/@tiptap/extension-text-style';
+import { TextStyle } from 'https://esm.sh/@tiptap/extension-text-style';
 import Color from 'https://esm.sh/@tiptap/extension-color';
 import FontFamily from 'https://esm.sh/@tiptap/extension-font-family';
 import Image from 'https://esm.sh/@tiptap/extension-image';
