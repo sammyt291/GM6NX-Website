@@ -36,6 +36,9 @@ let selectedImageBlock = null;
 let groupDropMarker = null;
 let groupDropMarkerGroup = null;
 let groupDropTarget = null;
+let draggingLine = null;
+
+const BLOCK_SELECTORS = ['.text-line', '.image-block', '.grid-group', '.html-widget'];
 
 async function ensureSession() {
   const res = await fetch('/api/session');
@@ -78,6 +81,8 @@ async function loadPage(slug) {
   editor.innerHTML = data.page.content || '';
   normalizeEditorImages(editor);
   initializeHtmlWidgets(editor);
+  normalizeTextLines(editor);
+  editor.querySelectorAll('.grid-cell').forEach((cell) => normalizeTextLines(cell));
   currentSlug = slug;
 }
 
@@ -145,12 +150,15 @@ async function createPageAt(parentItems, insertIndex, asChild = false, initialTi
   await loadPage(slug);
 }
 
-function insertImage(url, range = null) {
+function insertImage(url, options = {}) {
+  const { range = null, referenceNode = null, position = 'after' } = options;
   const img = document.createElement('img');
   img.src = url;
   img.draggable = true;
   const block = createImageBlock(img);
-  if (range) {
+  if (referenceNode) {
+    insertBlockAtPosition(editor, block, referenceNode, position);
+  } else if (range) {
     range.insertNode(block);
     range.setStartAfter(block);
     range.collapse(true);
@@ -162,7 +170,7 @@ function insertImage(url, range = null) {
   }
 }
 
-async function uploadImage(file, range = null) {
+async function uploadImage(file, options = {}) {
   const formData = new FormData();
   formData.append('image', file);
   const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -171,7 +179,7 @@ async function uploadImage(file, range = null) {
     return;
   }
   const data = await res.json();
-  insertImage(data.url, range);
+  insertImage(data.url, options);
 }
 
 function createGroup(rows = 1, cols = 1) {
@@ -203,7 +211,7 @@ function updateGroupCells(group) {
     const cell = document.createElement('div');
     cell.className = 'grid-cell';
     cell.contentEditable = true;
-    cell.textContent = 'Widget';
+    cell.appendChild(createTextLine('Widget'));
     cell.draggable = true;
     group.appendChild(cell);
   }
@@ -248,7 +256,7 @@ function addWidget(type) {
     `;
     initializeHtmlWidgets(cell);
   } else {
-    cell.textContent = 'Content widget';
+    cell.appendChild(createTextLine('Content widget'));
     cell.contentEditable = true;
   }
   cell.draggable = true;
@@ -307,16 +315,21 @@ function createDropMarker() {
   return marker;
 }
 
-function updateImageDropMarker(range) {
-  if (!range) return;
-  if (isRangeOnDropMarker(range)) return;
-  if (lastImageDropRange && range.startContainer === lastImageDropRange.container && range.startOffset === lastImageDropRange.offset) {
-    return;
-  }
+function updateImageDropMarkerFromEvent(container, event) {
+  const { referenceNode, position } = getBlockInsertPosition(container, event);
   clearImageDropMarker();
   dropMarker = createDropMarker();
-  range.insertNode(dropMarker);
-  lastImageDropRange = { container: range.startContainer, offset: range.startOffset };
+  if (!referenceNode) {
+    container.appendChild(dropMarker);
+  } else if (position === 'before') {
+    container.insertBefore(dropMarker, referenceNode);
+  } else {
+    container.insertBefore(dropMarker, referenceNode.nextSibling);
+  }
+  lastImageDropRange = {
+    container: dropMarker.parentNode,
+    offset: Array.from(dropMarker.parentNode.childNodes).indexOf(dropMarker),
+  };
 }
 
 function updateDropIndicator(cell, position) {
@@ -351,8 +364,14 @@ function extractDragContentFromCell(cell) {
   if (widget && cell.childNodes.length === 1) {
     return widget;
   }
+  const lines = Array.from(cell.querySelectorAll(':scope > .text-line'));
+  if (lines.length) {
+    const fragment = document.createDocumentFragment();
+    lines.forEach((line) => fragment.appendChild(line));
+    return fragment;
+  }
   if (isTextOnlyCell(cell)) {
-    return document.createTextNode(cell.textContent || '');
+    return createTextLine(cell.textContent || '');
   }
   const wrapper = document.createElement('div');
   wrapper.contentEditable = true;
@@ -379,6 +398,19 @@ function insertDraggedContentIntoEditor(content, range) {
   range.insertNode(content);
 }
 
+function insertBlockAtPosition(container, content, referenceNode, position) {
+  if (!content) return;
+  if (!referenceNode) {
+    container.appendChild(content);
+    return;
+  }
+  if (position === 'before') {
+    container.insertBefore(content, referenceNode);
+    return;
+  }
+  container.insertBefore(content, referenceNode.nextSibling);
+}
+
 function positionGroupControls() {
   if (!selectedGroup) return;
   const wrapper = editor.closest('.editor-wrapper');
@@ -389,36 +421,6 @@ function positionGroupControls() {
   const left = groupRect.right - wrapperRect.left + 12;
   groupControls.style.top = `${Math.max(0, top)}px`;
   groupControls.style.left = `${left}px`;
-}
-
-function getDropRange(event) {
-  if (document.caretRangeFromPoint) {
-    return document.caretRangeFromPoint(event.clientX, event.clientY);
-  }
-  if (document.caretPositionFromPoint) {
-    const position = document.caretPositionFromPoint(event.clientX, event.clientY);
-    if (position) {
-      const range = document.createRange();
-      range.setStart(position.offsetNode, position.offset);
-      range.collapse(true);
-      return range;
-    }
-  }
-  return null;
-}
-
-function isRangeOnDropMarker(range) {
-  if (!dropMarker || !range) return false;
-  const container = range.startContainer;
-  if (container === dropMarker || dropMarker.contains(container)) return true;
-  if (container.nodeType === Node.ELEMENT_NODE) {
-    const children = Array.from(container.childNodes);
-    const markerIndex = children.indexOf(dropMarker);
-    if (markerIndex !== -1) {
-      return range.startOffset === markerIndex || range.startOffset === markerIndex + 1;
-    }
-  }
-  return false;
 }
 
 function setSelectedImageBlock(block) {
@@ -513,14 +515,133 @@ function getClosestTarget(event, selector) {
   return target.closest(selector);
 }
 
+function createTextLine(text = '') {
+  const line = document.createElement('div');
+  line.className = 'text-line';
+  line.draggable = true;
+  if (text) {
+    line.textContent = text;
+  } else {
+    line.appendChild(document.createElement('br'));
+  }
+  return line;
+}
+
+function normalizeTextLineElement(line) {
+  if (!line.classList.contains('text-line')) {
+    line.classList.add('text-line');
+  }
+  line.draggable = true;
+  const breaks = Array.from(line.querySelectorAll('br'));
+  if (!breaks.length) return;
+  let current = line;
+  breaks.forEach((br) => {
+    const newLine = createTextLine('');
+    while (br.nextSibling) {
+      newLine.appendChild(br.nextSibling);
+    }
+    br.remove();
+    current.after(newLine);
+    current = newLine;
+  });
+  if (!line.textContent && !line.querySelector('br')) {
+    line.appendChild(document.createElement('br'));
+  }
+}
+
+function normalizeTextLines(container) {
+  if (!container) return;
+  const nodes = Array.from(container.childNodes);
+  nodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (!node.textContent.trim()) {
+        node.remove();
+        return;
+      }
+      const line = createTextLine();
+      line.textContent = node.textContent;
+      node.replaceWith(line);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      node.remove();
+      return;
+    }
+    const element = node;
+    if (element.matches(BLOCK_SELECTORS.join(','))) {
+      if (element.classList.contains('text-line')) {
+        normalizeTextLineElement(element);
+      }
+      return;
+    }
+    if (element.tagName === 'BR') {
+      element.replaceWith(createTextLine(''));
+      return;
+    }
+    const line = createTextLine('');
+    while (element.firstChild) {
+      line.appendChild(element.firstChild);
+    }
+    element.replaceWith(line);
+    normalizeTextLineElement(line);
+  });
+}
+
+function getDirectBlockChild(container, element) {
+  if (!element) return null;
+  let target = element.closest(BLOCK_SELECTORS.join(','));
+  while (target && target.parentElement !== container) {
+    target = target.parentElement;
+  }
+  return target && target.parentElement === container ? target : null;
+}
+
+function getBlockInsertPosition(container, event) {
+  const target = event.target instanceof Element ? getDirectBlockChild(container, event.target) : null;
+  if (!target) {
+    return { referenceNode: null, position: 'after' };
+  }
+  const rect = target.getBoundingClientRect();
+  const position = event.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+  return { referenceNode: target, position };
+}
+
+function createGridCellWithContent(content) {
+  const cell = document.createElement('div');
+  cell.className = 'grid-cell';
+  cell.contentEditable = true;
+  cell.draggable = true;
+  if (content) {
+    cell.appendChild(content);
+  }
+  return cell;
+}
+
+function setCaretToEnd(element) {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function isCaretAtLineStart(line, range) {
+  if (!line || !range || !range.collapsed) return false;
+  const testRange = range.cloneRange();
+  testRange.selectNodeContents(line);
+  testRange.setEnd(range.startContainer, range.startOffset);
+  return testRange.toString().length === 0;
+}
+
 async function handleImageDrop(event) {
   const files = Array.from(event.dataTransfer.files || []);
   if (!files.length) return;
   event.preventDefault();
   const imageFile = files.find((file) => file.type.startsWith('image/'));
   if (!imageFile) return;
-  const range = getDropRange(event);
-  await uploadImage(imageFile, range);
+  const { referenceNode, position } = getBlockInsertPosition(editor, event);
+  await uploadImage(imageFile, { referenceNode, position });
 }
 
 function createImageBlock(image) {
@@ -693,6 +814,18 @@ editor.addEventListener('click', (event) => {
   }
 });
 
+editor.addEventListener('input', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest('.html-widget')) return;
+  const cell = target.closest('.grid-cell');
+  if (cell) {
+    normalizeTextLines(cell);
+    return;
+  }
+  normalizeTextLines(editor);
+});
+
 editor.addEventListener('focus', () => {
   if (activeColor) {
     execCommand('foreColor', activeColor);
@@ -704,6 +837,7 @@ editor.addEventListener('dragstart', (event) => {
   const cell = getClosestTarget(event, '.grid-cell');
   if (!cell) return;
   draggingCell = cell;
+  draggingLine = null;
   event.dataTransfer.effectAllowed = 'move';
 });
 
@@ -711,8 +845,29 @@ editor.addEventListener('dragstart', (event) => {
   const image = getClosestTarget(event, 'img');
   if (!image || !editor.contains(image)) return;
   if (image.closest('.html-widget')) return;
+  const cell = image.closest('.grid-cell');
+  if (cell) {
+    draggingCell = cell;
+    draggingImage = null;
+    draggingLine = null;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', '');
+    return;
+  }
   draggingImage = image.closest('.image-block') || image;
   draggingCell = null;
+  draggingLine = null;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', '');
+});
+
+editor.addEventListener('dragstart', (event) => {
+  const line = getClosestTarget(event, '.text-line');
+  if (!line || !editor.contains(line)) return;
+  if (line.closest('.grid-cell')) return;
+  draggingLine = line;
+  draggingCell = null;
+  draggingImage = null;
   event.dataTransfer.effectAllowed = 'move';
   event.dataTransfer.setData('text/plain', '');
 });
@@ -723,18 +878,45 @@ editor.addEventListener('dragend', () => {
   clearGroupDropMarker();
   draggingCell = null;
   draggingImage = null;
+  draggingLine = null;
 });
 
 editor.addEventListener('dragover', (event) => {
-  if (draggingImage) {
+  if (draggingImage || draggingLine) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     const cell = getClosestTarget(event, '.grid-cell');
+    const group = getClosestTarget(event, '.grid-group');
     if (!cell) {
-      const range = getDropRange(event);
-      updateImageDropMarker(range);
+      if (group) {
+        document.querySelectorAll('.grid-group.drag-target').forEach((activeGroup) => {
+          if (activeGroup !== group) activeGroup.classList.remove('drag-target');
+        });
+        group.classList.add('drag-target');
+        updateGroupDropMarker(group);
+      } else {
+        updateImageDropMarkerFromEvent(editor, event);
+        document.querySelectorAll('.grid-group.drag-target').forEach((activeGroup) => {
+          activeGroup.classList.remove('drag-target');
+        });
+      }
+      if (dropTarget) {
+        dropTarget.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+        dropTarget = null;
+        dropPosition = null;
+      }
     } else {
       clearImageDropMarker();
+      const rect = cell.getBoundingClientRect();
+      const position = event.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+      updateDropIndicator(cell, position);
+      clearGroupDropMarker();
+      if (group) {
+        document.querySelectorAll('.grid-group.drag-target').forEach((activeGroup) => {
+          if (activeGroup !== group) activeGroup.classList.remove('drag-target');
+        });
+        group.classList.add('drag-target');
+      }
     }
     return;
   }
@@ -747,7 +929,13 @@ editor.addEventListener('dragover', (event) => {
     event.preventDefault();
     const rect = cell.getBoundingClientRect();
     const position = event.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
-    updateDropIndicator(cell, position);
+    if (cell !== draggingCell) {
+      updateDropIndicator(cell, position);
+    } else if (dropTarget) {
+      dropTarget.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+      dropTarget = null;
+      dropPosition = null;
+    }
     clearGroupDropMarker();
   } else if (draggingCell && dropTarget) {
     dropTarget.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
@@ -782,25 +970,38 @@ editor.addEventListener('dragleave', (event) => {
 });
 
 editor.addEventListener('drop', async (event) => {
-  if (draggingImage) {
+  if (draggingImage || draggingLine) {
     event.preventDefault();
     const cell = getClosestTarget(event, '.grid-cell');
-    if (cell) {
-      cell.appendChild(draggingImage);
+    const dropGroup = getClosestTarget(event, '.grid-group');
+    const content = draggingImage || draggingLine;
+    if (dropGroup) {
+      const newCell = createGridCellWithContent(content);
+      if (cell) {
+        const position = dropPosition || 'after';
+        if (position === 'before') {
+          dropGroup.insertBefore(newCell, cell);
+        } else {
+          dropGroup.insertBefore(newCell, cell.nextSibling);
+        }
+      } else {
+        dropGroup.appendChild(newCell);
+      }
     } else {
       if (dropMarker && dropMarker.parentNode) {
-        dropMarker.parentNode.insertBefore(draggingImage, dropMarker);
+        dropMarker.parentNode.insertBefore(content, dropMarker);
       } else {
-        const range = getDropRange(event);
-        if (range) {
-          range.insertNode(draggingImage);
-        } else {
-          editor.appendChild(draggingImage);
+        const { referenceNode, position } = getBlockInsertPosition(editor, event);
+        if (referenceNode !== content) {
+          insertBlockAtPosition(editor, content, referenceNode, position);
         }
       }
     }
     clearImageDropMarker();
+    clearDropIndicator();
+    clearGroupDropMarker();
     draggingImage = null;
+    draggingLine = null;
     return;
   }
   const cell = getClosestTarget(event, '.grid-cell');
@@ -827,9 +1028,9 @@ editor.addEventListener('drop', async (event) => {
   }
   if (draggingCell && !dropGroup) {
     event.preventDefault();
-    const range = getDropRange(event);
     const extracted = extractDragContentFromCell(draggingCell);
-    insertDraggedContentIntoEditor(extracted, range);
+    const { referenceNode, position } = getBlockInsertPosition(editor, event);
+    insertBlockAtPosition(editor, extracted, referenceNode, position);
     draggingCell.remove();
     clearDropIndicator();
     clearGroupDropMarker();
@@ -871,6 +1072,28 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && formatMode) {
     cancelFormatPainter();
   }
+  if (event.key === 'Backspace') {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed) return;
+    const line = range.startContainer instanceof Element
+      ? range.startContainer.closest('.text-line')
+      : range.startContainer.parentElement?.closest('.text-line');
+    if (!line) return;
+    if (!isCaretAtLineStart(line, range)) return;
+    const container = line.parentElement;
+    if (!container) return;
+    const previous = line.previousElementSibling;
+    if (previous && previous.classList.contains('text-line')) {
+      event.preventDefault();
+      while (line.firstChild) {
+        previous.appendChild(line.firstChild);
+      }
+      line.remove();
+      setCaretToEnd(previous);
+    }
+  }
 });
 
 logoutBtn.addEventListener('click', async () => {
@@ -895,4 +1118,5 @@ document.querySelectorAll('[data-command]').forEach((btn) => {
   await ensureSession();
   await loadPages();
   setActiveColor(activeColor);
+  normalizeTextLines(editor);
 })();
