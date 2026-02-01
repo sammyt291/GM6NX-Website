@@ -258,6 +258,15 @@ main {
   color: var(--text);
 }
 
+.editor-canvas .ProseMirror {
+  min-height: 380px;
+  outline: none;
+}
+
+.editor-canvas .ProseMirror > * + * {
+  margin-top: 0.75rem;
+}
+
 .editor-page .editor-canvas img {
   max-width: 100%;
   border-radius: 8px;
