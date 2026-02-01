@@ -9,8 +9,7 @@ const resetFormatBtn = document.getElementById('resetFormatBtn');
 const formatPainterBtn = document.getElementById('formatPainterBtn');
 const imageInput = document.getElementById('imageInput');
 const addGroupBtn = document.getElementById('addGroupBtn');
-const addTextWidget = document.getElementById('addTextWidget');
-const addImageWidget = document.getElementById('addImageWidget');
+const addContentWidget = document.getElementById('addContentWidget');
 const addHtmlWidget = document.getElementById('addHtmlWidget');
 const groupControls = document.getElementById('groupControls');
 const groupRowsInput = document.getElementById('groupRowsInput');
@@ -33,6 +32,10 @@ let formatMode = false;
 let formatTargetRange = null;
 const defaultTextColor = '#f5f7ff';
 let activeColor = colorPicker?.value || defaultTextColor;
+let selectedImageBlock = null;
+let groupDropPreview = null;
+let groupDropPreviewGroup = null;
+let groupDropPreviewPosition = null;
 
 async function ensureSession() {
   const res = await fetch('/api/session');
@@ -235,10 +238,7 @@ function addWidget(type) {
   if (!selectedGroup) return;
   const cell = document.createElement('div');
   cell.className = 'grid-cell';
-  if (type === 'image') {
-    cell.innerHTML = '<p>Image widget (upload into cell)</p>';
-    cell.contentEditable = true;
-  } else if (type === 'html') {
+  if (type === 'html') {
     cell.contentEditable = false;
     cell.innerHTML = `
       <div class="html-widget">
@@ -248,7 +248,7 @@ function addWidget(type) {
     `;
     initializeHtmlWidgets(cell);
   } else {
-    cell.textContent = 'Text widget';
+    cell.textContent = 'Content widget';
     cell.contentEditable = true;
   }
   cell.draggable = true;
@@ -264,6 +264,46 @@ function clearDropIndicator() {
   document.querySelectorAll('.grid-group.drag-target').forEach((group) => {
     group.classList.remove('drag-target');
   });
+}
+
+function clearGroupDropPreview() {
+  if (groupDropPreview) {
+    groupDropPreview.remove();
+    groupDropPreview = null;
+  }
+  groupDropPreviewGroup = null;
+  groupDropPreviewPosition = null;
+}
+
+function createGroupDropPreview() {
+  const preview = document.createElement('div');
+  preview.className = 'grid-cell drop-preview';
+  preview.textContent = 'New widget';
+  preview.contentEditable = false;
+  preview.draggable = false;
+  return preview;
+}
+
+function updateGroupDropPreview(group, cell, position) {
+  if (!group) return;
+  const preview = groupDropPreview || createGroupDropPreview();
+  if (groupDropPreview && groupDropPreviewGroup === group && groupDropPreviewPosition === position && cell === dropTarget) {
+    return;
+  }
+  preview.classList.remove('drop-preview-before', 'drop-preview-after');
+  preview.classList.add(position === 'before' ? 'drop-preview-before' : 'drop-preview-after');
+  if (cell) {
+    if (position === 'before') {
+      group.insertBefore(preview, cell);
+    } else {
+      group.insertBefore(preview, cell.nextSibling);
+    }
+  } else {
+    group.appendChild(preview);
+  }
+  groupDropPreview = preview;
+  groupDropPreviewGroup = group;
+  groupDropPreviewPosition = position;
 }
 
 function clearImageDropMarker() {
@@ -349,6 +389,29 @@ function isRangeOnDropMarker(range) {
     }
   }
   return false;
+}
+
+function setSelectedImageBlock(block) {
+  if (selectedImageBlock) {
+    selectedImageBlock.classList.remove('is-selected');
+  }
+  selectedImageBlock = block;
+  if (selectedImageBlock) {
+    selectedImageBlock.classList.add('is-selected');
+  }
+}
+
+function applyImageAlignment(command) {
+  if (!selectedImageBlock) return false;
+  const alignMap = {
+    justifyLeft: 'left',
+    justifyCenter: 'center',
+    justifyRight: 'right',
+  };
+  const align = alignMap[command];
+  if (!align) return false;
+  selectedImageBlock.dataset.align = align;
+  return true;
 }
 
 function buildInlineStyleFromComputedStyles(styles) {
@@ -580,6 +643,12 @@ editor.addEventListener('click', (event) => {
     cancelFormatPainter();
     return;
   }
+  const imageBlock = event.target.closest('.image-block');
+  if (imageBlock && editor.contains(imageBlock)) {
+    setSelectedImageBlock(imageBlock);
+  } else {
+    setSelectedImageBlock(null);
+  }
   const group = event.target.closest('.grid-group');
   if (group) {
     setSelectedGroup(group);
@@ -615,6 +684,7 @@ editor.addEventListener('dragstart', (event) => {
 editor.addEventListener('dragend', () => {
   clearDropIndicator();
   clearImageDropMarker();
+  clearGroupDropPreview();
   draggingCell = null;
   draggingImage = null;
 });
@@ -636,12 +706,19 @@ editor.addEventListener('dragover', (event) => {
     event.preventDefault();
     return;
   }
-  const cell = event.target.closest('.grid-cell');
+  let cell = event.target.closest('.grid-cell');
+  if (cell && cell.classList.contains('drop-preview')) {
+    cell = null;
+  }
   if (cell && draggingCell) {
     event.preventDefault();
     const rect = cell.getBoundingClientRect();
     const position = event.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
     updateDropIndicator(cell, position);
+    const group = cell.closest('.grid-group');
+    if (group) {
+      updateGroupDropPreview(group, cell, position);
+    }
   }
   const group = event.target.closest('.grid-group');
   if (group && draggingCell) {
@@ -649,6 +726,10 @@ editor.addEventListener('dragover', (event) => {
       if (activeGroup !== group) activeGroup.classList.remove('drag-target');
     });
     group.classList.add('drag-target');
+    if (!cell) {
+      event.preventDefault();
+      updateGroupDropPreview(group, null, 'after');
+    }
   }
 });
 
@@ -689,6 +770,15 @@ editor.addEventListener('drop', async (event) => {
   if (cell) {
     cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
   }
+  const dropGroup = event.target.closest('.grid-group');
+  if (draggingCell && groupDropPreview && dropGroup && dropGroup === groupDropPreviewGroup) {
+    event.preventDefault();
+    groupDropPreview.replaceWith(draggingCell);
+    clearGroupDropPreview();
+    clearDropIndicator();
+    draggingCell = null;
+    return;
+  }
   if (draggingCell && cell && draggingCell !== cell) {
     event.preventDefault();
     const parent = cell.parentElement;
@@ -702,11 +792,13 @@ editor.addEventListener('drop', async (event) => {
       }
     }
     clearDropIndicator();
+    clearGroupDropPreview();
     draggingCell = null;
     return;
   }
   await handleImageDrop(event);
   clearDropIndicator();
+  clearGroupDropPreview();
   draggingCell = null;
 });
 
@@ -728,8 +820,7 @@ imageInput.addEventListener('change', (event) => {
 });
 
 addGroupBtn.addEventListener('click', () => createGroup(1, 1));
-addTextWidget.addEventListener('click', () => addWidget('text'));
-addImageWidget.addEventListener('click', () => addWidget('image'));
+addContentWidget.addEventListener('click', () => addWidget('content'));
 addHtmlWidget.addEventListener('click', () => addWidget('html'));
 groupRowsInput.addEventListener('change', updateGroupDimensions);
 groupColsInput.addEventListener('change', updateGroupDimensions);
@@ -748,7 +839,11 @@ logoutBtn.addEventListener('click', async () => {
 });
 
 document.querySelectorAll('[data-command]').forEach((btn) => {
-  btn.addEventListener('click', () => execCommand(btn.dataset.command));
+  btn.addEventListener('click', () => {
+    const command = btn.dataset.command;
+    if (applyImageAlignment(command)) return;
+    execCommand(command);
+  });
 });
 
 (async function init() {
