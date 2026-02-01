@@ -6,6 +6,7 @@ const fontSelect = document.getElementById('fontSelect');
 const sizeSelect = document.getElementById('sizeSelect');
 const colorPicker = document.getElementById('colorPicker');
 const resetFormatBtn = document.getElementById('resetFormatBtn');
+const formatPainterBtn = document.getElementById('formatPainterBtn');
 const imageInput = document.getElementById('imageInput');
 const addGroupBtn = document.getElementById('addGroupBtn');
 const addTextWidget = document.getElementById('addTextWidget');
@@ -22,9 +23,13 @@ let navItems = [];
 let currentSlug = null;
 let selectedGroup = null;
 let draggingCell = null;
+let draggingImage = null;
 let dropTarget = null;
 let dropPosition = null;
+let dropMarker = null;
 let toastTimeout = null;
+let formatMode = false;
+let formatTargetRange = null;
 const defaultTextColor = '#f5f7ff';
 let activeColor = colorPicker?.value || defaultTextColor;
 
@@ -261,6 +266,26 @@ function clearDropIndicator() {
   });
 }
 
+function clearImageDropMarker() {
+  if (dropMarker) {
+    dropMarker.remove();
+    dropMarker = null;
+  }
+}
+
+function createDropMarker() {
+  const marker = document.createElement('div');
+  marker.className = 'image-drop-marker';
+  return marker;
+}
+
+function updateImageDropMarker(range) {
+  if (!range) return;
+  clearImageDropMarker();
+  dropMarker = createDropMarker();
+  range.insertNode(dropMarker);
+}
+
 function updateDropIndicator(cell, position) {
   if (!cell) return;
   if (dropTarget && dropTarget !== cell) {
@@ -304,6 +329,69 @@ function getDropRange(event) {
     }
   }
   return null;
+}
+
+function buildInlineStyleFromComputedStyles(styles) {
+  const rules = [];
+  if (styles.color) rules.push(`color: ${styles.color}`);
+  if (styles.backgroundColor && styles.backgroundColor !== 'rgba(0, 0, 0, 0)' && styles.backgroundColor !== 'transparent') {
+    rules.push(`background-color: ${styles.backgroundColor}`);
+  }
+  if (styles.fontFamily) rules.push(`font-family: ${styles.fontFamily}`);
+  if (styles.fontSize) rules.push(`font-size: ${styles.fontSize}`);
+  if (styles.fontWeight) rules.push(`font-weight: ${styles.fontWeight}`);
+  if (styles.fontStyle) rules.push(`font-style: ${styles.fontStyle}`);
+  if (styles.textDecorationLine && styles.textDecorationLine !== 'none') {
+    rules.push(`text-decoration-line: ${styles.textDecorationLine}`);
+  }
+  if (styles.letterSpacing && styles.letterSpacing !== 'normal') {
+    rules.push(`letter-spacing: ${styles.letterSpacing}`);
+  }
+  if (styles.textTransform && styles.textTransform !== 'none') {
+    rules.push(`text-transform: ${styles.textTransform}`);
+  }
+  if (styles.lineHeight && styles.lineHeight !== 'normal') {
+    rules.push(`line-height: ${styles.lineHeight}`);
+  }
+  return rules.join('; ');
+}
+
+function applyFormattingToRange(range, styles) {
+  if (!range || range.collapsed) return;
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  const styleText = buildInlineStyleFromComputedStyles(styles);
+  if (!styleText) return;
+  const fragment = range.extractContents();
+  const span = document.createElement('span');
+  span.setAttribute('style', styleText);
+  span.appendChild(fragment);
+  range.insertNode(span);
+  range.setStartAfter(span);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function startFormatPainter() {
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  if (range.collapsed) {
+    showToast('Highlight text to reformat first.');
+    return;
+  }
+  formatTargetRange = range.cloneRange();
+  formatMode = true;
+  editor.classList.add('format-mode');
+  showToast('Click text to copy formatting.');
+}
+
+function cancelFormatPainter() {
+  formatMode = false;
+  formatTargetRange = null;
+  editor.classList.remove('format-mode');
 }
 
 async function handleImageDrop(event) {
@@ -413,6 +501,17 @@ function createSiteMapActions(parentItems, index, item = null) {
 }
 
 editor.addEventListener('click', (event) => {
+  if (formatMode) {
+    event.preventDefault();
+    event.stopPropagation();
+    const source = event.target.closest('*');
+    if (source && editor.contains(source)) {
+      const styles = window.getComputedStyle(source);
+      applyFormattingToRange(formatTargetRange, styles);
+    }
+    cancelFormatPainter();
+    return;
+  }
   const group = event.target.closest('.grid-group');
   if (group) {
     setSelectedGroup(group);
@@ -428,18 +527,42 @@ editor.addEventListener('focus', () => {
 });
 
 editor.addEventListener('dragstart', (event) => {
+  if (event.target.closest('img')) return;
   const cell = event.target.closest('.grid-cell');
   if (!cell) return;
   draggingCell = cell;
   event.dataTransfer.effectAllowed = 'move';
 });
 
+editor.addEventListener('dragstart', (event) => {
+  const image = event.target.closest('img');
+  if (!image || !editor.contains(image)) return;
+  draggingImage = image;
+  draggingCell = null;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', '');
+});
+
 editor.addEventListener('dragend', () => {
   clearDropIndicator();
+  clearImageDropMarker();
   draggingCell = null;
+  draggingImage = null;
 });
 
 editor.addEventListener('dragover', (event) => {
+  if (draggingImage) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const cell = event.target.closest('.grid-cell');
+    if (!cell) {
+      const range = getDropRange(event);
+      updateImageDropMarker(range);
+    } else {
+      clearImageDropMarker();
+    }
+    return;
+  }
   if (event.dataTransfer.types && event.dataTransfer.types.includes('Files')) {
     event.preventDefault();
     return;
@@ -472,6 +595,23 @@ editor.addEventListener('dragleave', (event) => {
 });
 
 editor.addEventListener('drop', async (event) => {
+  if (draggingImage) {
+    event.preventDefault();
+    const cell = event.target.closest('.grid-cell');
+    if (cell) {
+      cell.appendChild(draggingImage);
+    } else {
+      const range = getDropRange(event);
+      if (range) {
+        range.insertNode(draggingImage);
+      } else {
+        editor.appendChild(draggingImage);
+      }
+    }
+    clearImageDropMarker();
+    draggingImage = null;
+    return;
+  }
   const cell = event.target.closest('.grid-cell');
   if (cell) {
     cell.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
@@ -504,6 +644,7 @@ fontSelect.addEventListener('change', (event) => execCommand('fontName', event.t
 sizeSelect.addEventListener('change', (event) => execCommand('fontSize', event.target.value));
 colorPicker.addEventListener('change', (event) => setActiveColor(event.target.value));
 resetFormatBtn.addEventListener('click', () => execCommand('removeFormat'));
+formatPainterBtn.addEventListener('click', startFormatPainter);
 
 imageInput.addEventListener('change', (event) => {
   const file = event.target.files[0];
@@ -522,6 +663,11 @@ groupColsInput.addEventListener('change', updateGroupDimensions);
 
 window.addEventListener('resize', positionGroupControls);
 editor.addEventListener('scroll', positionGroupControls);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && formatMode) {
+    cancelFormatPainter();
+  }
+});
 
 logoutBtn.addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' });

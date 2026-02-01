@@ -258,7 +258,7 @@ main {
   color: var(--text);
 }
 
-.editor-canvas img {
+.editor-page .editor-canvas img {
   max-width: 100%;
   border-radius: 8px;
   cursor: grab;
@@ -416,38 +416,45 @@ main {
 .grid-group {
   display: grid;
   gap: 12px;
+  margin: 12px 0;
+}
+
+.editor-page .grid-group {
   border: 1px dashed var(--accent);
   padding: 12px;
-  margin: 12px 0;
   border-radius: 12px;
   position: relative;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.grid-group.drag-target {
+.editor-page .grid-group.drag-target {
   border-color: var(--accent-2);
   box-shadow: 0 0 0 2px rgba(95, 227, 182, 0.35);
   animation: group-pulse 0.9s ease-in-out infinite;
 }
 
 .grid-cell {
+  min-height: 40px;
+}
+
+.editor-page .grid-cell {
   background: rgba(124, 92, 255, 0.1);
   padding: 8px;
   border-radius: 8px;
   min-height: 60px;
 }
 
-.grid-cell[draggable='true'] {
+.editor-page .grid-cell[draggable='true'] {
   cursor: grab;
 }
 
-.grid-cell.drag-over {
+.editor-page .grid-cell.drag-over {
   outline: 2px dashed rgba(95, 227, 182, 0.5);
   outline-offset: 4px;
   position: relative;
 }
 
-.grid-cell.drag-over::after {
+.editor-page .grid-cell.drag-over::after {
   content: '';
   position: absolute;
   left: 12px;
@@ -458,12 +465,36 @@ main {
   animation: drop-indicator 0.8s ease-in-out infinite;
 }
 
-.grid-cell.drag-over-before::after {
+.editor-page .grid-cell.drag-over-before::after {
   top: -2px;
 }
 
-.grid-cell.drag-over-after::after {
+.editor-page .grid-cell.drag-over-after::after {
   bottom: -2px;
+}
+
+.editor-page .image-drop-marker {
+  height: 12px;
+  margin: 6px 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(95, 227, 182, 0.35), rgba(124, 92, 255, 0.4));
+  animation: drop-gap 0.7s ease-in-out infinite;
+}
+
+.editor-page .format-mode {
+  cursor: copy;
+}
+
+@keyframes drop-gap {
+  0%,
+  100% {
+    transform: scaleY(0.6);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 .html-widget {
