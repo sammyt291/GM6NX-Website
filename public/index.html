@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GM6NX Website</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <nav class="navbar">
+        <div class="brand">GM6NX</div>
+        <div class="nav-links" id="navLinks"></div>
+        <div class="nav-actions">
+          <button class="secondary" id="editNavBtn" hidden>Edit navigation</button>
+          <a class="button secondary" id="adminLink" href="/admin.html" hidden>Admins</a>
+          <a class="button" id="editorLink" href="/editor.html" hidden>Open editor</a>
+          <button id="authBtn">Login</button>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1 id="pageTitle">Welcome to GM6NX</h1>
+        <p id="pageDescription">
+          A refreshed experience with live page editing, dynamic navigation, and SSL-aware hosting.
+        </p>
+      </section>
+
+      <section class="section">
+        <div class="page-content" id="pageContent"></div>
+      </section>
+
+      <div class="footer">Powered by the GM6NX editor stack.</div>
+    </main>
+
+    <div class="modal-backdrop" id="navModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Navigation builder</h3>
+          <button class="secondary" id="closeNavModal">Close</button>
+        </div>
+        <div class="notice">Reorder, add pages, dividers, or dropdown groups. Save to publish.</div>
+        <div class="modal-list" id="navList"></div>
+        <div style="margin-top: 16px; display: flex; gap: 8px;">
+          <button id="addNavItem">Add page</button>
+          <button class="secondary" id="addNavDivider">Add divider</button>
+          <button class="secondary" id="saveNav">Save navigation</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="loginModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Admin login</h3>
+          <button class="secondary" id="closeLoginModal">Close</button>
+        </div>
+        <form id="loginForm">
+          <div style="display: grid; gap: 12px;">
+            <input name="username" placeholder="Username" required />
+            <input name="password" type="password" placeholder="Password" required />
+            <button type="submit">Login</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

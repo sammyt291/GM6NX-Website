@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GM6NX Editor</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <nav class="navbar">
+        <div class="brand">GM6NX Editor</div>
+        <div class="nav-actions">
+          <a class="button secondary" href="/">Back to site</a>
+          <button id="logoutBtn">Logout</button>
+        </div>
+      </nav>
+    </header>
+    <main>
+      <h1>Page editor</h1>
+      <div class="toolbar">
+        <select id="pageSelect"></select>
+        <button id="newPageBtn" class="secondary">New page</button>
+        <button id="savePageBtn">Save page</button>
+        <button data-command="bold" class="secondary">Bold</button>
+        <button data-command="italic" class="secondary">Italic</button>
+        <button data-command="underline" class="secondary">Underline</button>
+        <button data-command="justifyLeft" class="secondary">Left</button>
+        <button data-command="justifyCenter" class="secondary">Center</button>
+        <button data-command="justifyRight" class="secondary">Right</button>
+        <select id="fontSelect" class="secondary">
+          <option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Verdana">Verdana</option>
+        </select>
+        <select id="sizeSelect" class="secondary">
+          <option value="1">Small</option>
+          <option value="3" selected>Normal</option>
+          <option value="5">Large</option>
+          <option value="7">Hero</option>
+        </select>
+        <input type="color" id="colorPicker" />
+        <label class="button secondary">
+          Upload image
+          <input type="file" id="imageInput" accept="image/*" hidden />
+        </label>
+        <button id="addGroupBtn" class="secondary">Add group</button>
+      </div>
+
+      <div class="editor-layout">
+        <div>
+          <div id="editor" class="editor-canvas" contenteditable="true"></div>
+          <p class="notice">Tip: drag images within the editor to reposition between text lines.</p>
+        </div>
+        <aside class="sidebar">
+          <h3>Group controls</h3>
+          <p class="notice">Select a group to adjust its grid and add widgets.</p>
+          <button id="addRowBtn" class="secondary">Add row</button>
+          <button id="addColBtn" class="secondary">Add column</button>
+          <button id="addTextWidget" class="secondary">Add text widget</button>
+          <button id="addImageWidget" class="secondary">Add image widget</button>
+          <button id="addHtmlWidget" class="secondary">Add HTML widget</button>
+        </aside>
+      </div>
+    </main>
+
+    <script src="/editor.js"></script>
+  </body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GM6NX Admins</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <nav class="navbar">
+        <div class="brand">Admin Accounts</div>
+        <div class="nav-actions">
+          <a class="button secondary" href="/">Back to site</a>
+          <button id="logoutBtn">Logout</button>
+        </div>
+      </nav>
+    </header>
+    <main>
+      <h1>Manage admin accounts</h1>
+      <div class="section">
+        <table class="table" id="adminTable">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>New password</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h3>Add admin</h3>
+        <form id="addAdminForm" style="display: grid; gap: 12px;">
+          <input name="username" placeholder="Username" required />
+          <input name="password" type="password" placeholder="Password" required />
+          <button type="submit">Add admin</button>
+        </form>
+      </div>
+    </main>
+
+    <script src="/admin.js"></script>
+  </body>
+</html>
