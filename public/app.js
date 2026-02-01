@@ -94,6 +94,8 @@ async function loadPage(slug, fallbackTitle) {
     const data = await res.json();
     pageTitle.textContent = data.page.title || fallbackTitle || 'GM6NX';
     pageContent.innerHTML = data.page.content || '<p>Empty page.</p>';
+    prepareHtmlWidgetsForView(pageContent);
+    normalizeContentImages(pageContent);
     disableGroupEditing();
   } catch {
     pageTitle.textContent = fallbackTitle || 'GM6NX';
@@ -111,6 +113,45 @@ function disableGroupEditing() {
     group.querySelectorAll('[draggable]').forEach((node) => {
       node.removeAttribute('draggable');
     });
+  });
+}
+
+function createImageBlock(image) {
+  const block = document.createElement('div');
+  block.className = 'image-block';
+  block.appendChild(image);
+  return block;
+}
+
+function normalizeContentImages(container) {
+  const images = Array.from(container.querySelectorAll('img'));
+  images.forEach((img) => {
+    if (img.closest('.html-widget')) return;
+    img.removeAttribute('draggable');
+    if (!img.closest('.image-block')) {
+      const block = createImageBlock(img);
+      img.replaceWith(block);
+      block.removeAttribute('draggable');
+    }
+  });
+}
+
+function prepareHtmlWidgetsForView(container) {
+  const widgets = Array.from(container.querySelectorAll('.html-widget'));
+  widgets.forEach((widget) => {
+    const source = widget.querySelector('.html-source');
+    let preview = widget.querySelector('.html-preview');
+    const value = source ? source.value || source.textContent || '' : preview?.innerHTML || '';
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'html-preview';
+      widget.appendChild(preview);
+    }
+    preview.innerHTML = value;
+    if (source) {
+      source.remove();
+    }
+    widget.classList.add('read-only');
   });
 }
 

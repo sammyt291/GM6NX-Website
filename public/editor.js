@@ -72,6 +72,8 @@ async function loadPage(slug) {
   if (!res.ok) return;
   const data = await res.json();
   editor.innerHTML = data.page.content || '';
+  normalizeEditorImages(editor);
+  initializeHtmlWidgets(editor);
   currentSlug = slug;
 }
 
@@ -99,6 +101,7 @@ function showToast(message) {
 
 async function savePage() {
   if (!currentSlug) return;
+  syncHtmlWidgets(editor);
   const res = await fetch(`/api/pages/${currentSlug}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -142,15 +145,16 @@ function insertImage(url, range = null) {
   const img = document.createElement('img');
   img.src = url;
   img.draggable = true;
+  const block = createImageBlock(img);
   if (range) {
-    range.insertNode(img);
-    range.setStartAfter(img);
+    range.insertNode(block);
+    range.setStartAfter(block);
     range.collapse(true);
     const selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
   } else {
-    editor.appendChild(img);
+    editor.appendChild(block);
   }
 }
 
@@ -241,12 +245,7 @@ function addWidget(type) {
         <div class="html-preview"></div>
       </div>
     `;
-    const source = cell.querySelector('.html-source');
-    const preview = cell.querySelector('.html-preview');
-    preview.innerHTML = source.value;
-    source.addEventListener('input', () => {
-      preview.innerHTML = source.value;
-    });
+    initializeHtmlWidgets(cell);
   } else {
     cell.textContent = 'Text widget';
     cell.contentEditable = true;
@@ -404,6 +403,54 @@ async function handleImageDrop(event) {
   await uploadImage(imageFile, range);
 }
 
+function createImageBlock(image) {
+  const block = document.createElement('div');
+  block.className = 'image-block';
+  block.appendChild(image);
+  return block;
+}
+
+function normalizeEditorImages(container) {
+  const images = Array.from(container.querySelectorAll('img'));
+  images.forEach((img) => {
+    if (img.closest('.html-widget')) return;
+    img.draggable = true;
+    if (!img.closest('.image-block')) {
+      const block = createImageBlock(img);
+      img.replaceWith(block);
+    }
+  });
+}
+
+function getHtmlSourceValue(source) {
+  return source.value || source.textContent || '';
+}
+
+function initializeHtmlWidgets(container) {
+  const widgets = Array.from(container.querySelectorAll('.html-widget'));
+  widgets.forEach((widget) => {
+    if (widget.dataset.ready === 'true') return;
+    const source = widget.querySelector('.html-source');
+    const preview = widget.querySelector('.html-preview');
+    if (!source || !preview) return;
+    const value = getHtmlSourceValue(source);
+    source.value = value;
+    source.textContent = value;
+    preview.innerHTML = value;
+    source.addEventListener('input', () => {
+      preview.innerHTML = source.value;
+      source.textContent = source.value;
+    });
+    widget.dataset.ready = 'true';
+  });
+}
+
+function syncHtmlWidgets(container) {
+  container.querySelectorAll('.html-widget .html-source').forEach((source) => {
+    source.textContent = source.value || source.textContent || '';
+  });
+}
+
 async function saveNavItems() {
   await fetch('/api/nav', {
     method: 'PUT',
@@ -537,7 +584,8 @@ editor.addEventListener('dragstart', (event) => {
 editor.addEventListener('dragstart', (event) => {
   const image = event.target.closest('img');
   if (!image || !editor.contains(image)) return;
-  draggingImage = image;
+  if (image.closest('.html-widget')) return;
+  draggingImage = image.closest('.image-block') || image;
   draggingCell = null;
   event.dataTransfer.effectAllowed = 'move';
   event.dataTransfer.setData('text/plain', '');

@@ -481,6 +481,17 @@ main {
   animation: drop-gap 0.7s ease-in-out infinite;
 }
 
+.image-block {
+  display: block;
+  margin: 12px 0;
+}
+
+.image-block img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .editor-page .format-mode {
   cursor: copy;
 }
