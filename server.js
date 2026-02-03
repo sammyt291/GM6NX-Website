@@ -251,7 +251,14 @@ app.post('/api/upload', requireAuth, upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
-  res.json({ url: `/uploads/${req.file.filename}` });
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto || req.protocol)
+    .split(',')[0]
+    .trim();
+  const host = req.get('host');
+  const baseUrl = host ? `${protocol}://${host}` : '';
+  const url = baseUrl ? new URL(`/uploads/${req.file.filename}`, baseUrl).toString() : `/uploads/${req.file.filename}`;
+  res.json({ url });
 });
 
 function startHttpServer() {
