@@ -8,6 +8,7 @@ const toast = document.getElementById('toast');
 const imageSizePanel = document.getElementById('imageSizePanel');
 const imageWidthSelect = document.getElementById('imageWidthSelect');
 const imageHeightSelect = document.getElementById('imageHeightSelect');
+const imagePositionSelect = document.getElementById('imagePositionSelect');
 
 let pages = [];
 let navItems = [];
@@ -16,6 +17,7 @@ let toastTimeout = null;
 let trumbowygInstance = null;
 let selectedImage = null;
 let clipboardImageHtml = null;
+let dragState = null;
 
 const fontFamilies = ['Arial', 'Georgia', 'Times New Roman', 'Verdana'];
 
@@ -43,12 +45,8 @@ function initEditor() {
   });
 }
 
-function hasResizeBox() {
-  return !!editorElement?.querySelector('.trumbowyg-resize-box');
-}
-
 function syncImageSizePanel() {
-  if (!selectedImage || !imageWidthSelect || !imageHeightSelect) return;
+  if (!selectedImage || !imageWidthSelect || !imageHeightSelect || !imagePositionSelect) return;
   const widthValue = selectedImage.style.width;
   const heightValue = selectedImage.style.height;
   imageWidthSelect.value = imageWidthSelect.querySelector(`option[value="${widthValue}"]`)
@@ -57,11 +55,12 @@ function syncImageSizePanel() {
   imageHeightSelect.value = imageHeightSelect.querySelector(`option[value="${heightValue}"]`)
     ? heightValue
     : 'auto';
+  imagePositionSelect.value = selectedImage.classList.contains('image-tight') ? 'tight' : 'inline';
 }
 
 function updateImageSizePanel() {
   if (!imageSizePanel) return;
-  const shouldShow = !!selectedImage && hasResizeBox();
+  const shouldShow = !!selectedImage;
   imageSizePanel.classList.toggle('is-visible', shouldShow);
   imageSizePanel.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
   if (shouldShow) {
@@ -81,6 +80,60 @@ function applyImageSizeChange(axis, value) {
     return;
   }
   selectedImage.style[axis] = value;
+}
+
+function getImageOffsetInEditor(image) {
+  if (!editorElement || !image) return { left: 0, top: 0 };
+  const editorRect = editorElement.getBoundingClientRect();
+  const imageRect = image.getBoundingClientRect();
+  return {
+    left: imageRect.left - editorRect.left + editorElement.scrollLeft,
+    top: imageRect.top - editorRect.top + editorElement.scrollTop,
+  };
+}
+
+function applyImagePositionChange(value) {
+  if (!selectedImage) return;
+  if (value === 'tight') {
+    selectedImage.classList.add('image-tight');
+    const { left, top } = getImageOffsetInEditor(selectedImage);
+    selectedImage.style.position = 'absolute';
+    selectedImage.style.left = `${left}px`;
+    selectedImage.style.top = `${top}px`;
+    return;
+  }
+  selectedImage.classList.remove('image-tight');
+  selectedImage.style.removeProperty('position');
+  selectedImage.style.removeProperty('left');
+  selectedImage.style.removeProperty('top');
+}
+
+function startTightDrag(event, image) {
+  if (!image?.classList.contains('image-tight')) return;
+  const { left, top } = getImageOffsetInEditor(image);
+  dragState = {
+    image,
+    startX: event.clientX,
+    startY: event.clientY,
+    originLeft: left,
+    originTop: top,
+  };
+  image.style.position = 'absolute';
+  image.style.left = `${left}px`;
+  image.style.top = `${top}px`;
+  event.preventDefault();
+}
+
+function handleTightDragMove(event) {
+  if (!dragState) return;
+  const dx = event.clientX - dragState.startX;
+  const dy = event.clientY - dragState.startY;
+  dragState.image.style.left = `${dragState.originLeft + dx}px`;
+  dragState.image.style.top = `${dragState.originTop + dy}px`;
+}
+
+function stopTightDrag() {
+  dragState = null;
 }
 
 function insertHtmlAtCursor(html) {
@@ -378,14 +431,28 @@ function initImageSizeControls() {
       applyImageSizeChange('height', event.target.value);
     });
   }
+  if (imagePositionSelect) {
+    imagePositionSelect.addEventListener('change', (event) => {
+      applyImagePositionChange(event.target.value);
+    });
+  }
   if (editorElement) {
     editorElement.addEventListener('click', handleEditorClick);
+    editorElement.addEventListener('pointerdown', (event) => {
+      const image = event.target.closest('img');
+      if (image && editorElement.contains(image)) {
+        setSelectedImage(image);
+        startTightDrag(event, image);
+      }
+    });
     editorElement.addEventListener('copy', handleEditorCopyCut);
     editorElement.addEventListener('cut', handleEditorCopyCut);
     editorElement.addEventListener('paste', handleEditorPaste);
     const observer = new MutationObserver(() => updateImageSizePanel());
     observer.observe(editorElement, { childList: true, subtree: true });
   }
+  document.addEventListener('pointermove', handleTightDragMove);
+  document.addEventListener('pointerup', stopTightDrag);
 }
 
 newPageBtn.addEventListener('click', () => createPageAt(navItems, navItems.length - 1));
