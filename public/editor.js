@@ -19,7 +19,6 @@ let selectedImage = null;
 let clipboardImageHtml = null;
 let dragState = null;
 let tightAnchorCounter = 0;
-let activeTightSelection = null;
 
 const tightAnchorSelector = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, div';
 
@@ -164,38 +163,6 @@ function applyTightAnchorPosition(image) {
   image.draggable = false;
 }
 
-function applyTightAnchorPositionToElement(element, anchorId, offsetLeft, offsetTop) {
-  if (!element || !editorElement) return;
-  const anchor = anchorId
-    ? editorElement.querySelector(`[data-tight-anchor-id="${anchorId}"]`)
-    : null;
-  const resolvedAnchor = anchor || editorElement;
-  const editorRect = editorElement.getBoundingClientRect();
-  const anchorRect = resolvedAnchor.getBoundingClientRect();
-  const left = anchorRect.left - editorRect.left + editorElement.scrollLeft + offsetLeft;
-  const top = anchorRect.top - editorRect.top + editorElement.scrollTop + offsetTop;
-  element.style.position = 'absolute';
-  element.style.left = `${left}px`;
-  element.style.top = `${top}px`;
-  element.style.zIndex = '2';
-}
-
-function cacheActiveTightSelection(image) {
-  if (!image?.classList.contains('image-tight')) {
-    activeTightSelection = null;
-    return;
-  }
-  if (!image.dataset.tightAnchorId) {
-    const { left, top } = getImageOffsetInEditor(image);
-    storeTightAnchorPosition(image, getAnchorForImage(image), left, top);
-  }
-  activeTightSelection = {
-    anchorId: image.dataset.tightAnchorId || '',
-    offsetLeft: Number.parseFloat(image.dataset.tightOffsetX || '0'),
-    offsetTop: Number.parseFloat(image.dataset.tightOffsetY || '0'),
-  };
-}
-
 function refreshTightImages() {
   if (!editorElement) return;
   const images = editorElement.querySelectorAll('img.image-tight');
@@ -208,19 +175,6 @@ function refreshTightImages() {
   });
 }
 
-function refreshTightCanvases() {
-  if (!editorElement) return;
-  const canvases = editorElement.querySelectorAll('canvas[id^="trumbowyg-resizimg-"]');
-  canvases.forEach((canvas) => {
-    const anchorId = canvas.dataset.tightAnchorId;
-    const offsetLeft = Number.parseFloat(canvas.dataset.tightOffsetX || '0');
-    const offsetTop = Number.parseFloat(canvas.dataset.tightOffsetY || '0');
-    if (anchorId) {
-      applyTightAnchorPositionToElement(canvas, anchorId, offsetLeft, offsetTop);
-    }
-  });
-}
-
 function applyImagePositionChange(value) {
   if (!selectedImage) return;
   if (value === 'tight') {
@@ -228,7 +182,6 @@ function applyImagePositionChange(value) {
     const { left, top } = getImageOffsetInEditor(selectedImage);
     storeTightAnchorPosition(selectedImage, getAnchorForImage(selectedImage), left, top);
     applyTightAnchorPosition(selectedImage);
-    cacheActiveTightSelection(selectedImage);
     return;
   }
   selectedImage.classList.remove('image-tight');
@@ -239,7 +192,6 @@ function applyImagePositionChange(value) {
   selectedImage.style.removeProperty('left');
   selectedImage.style.removeProperty('top');
   selectedImage.draggable = true;
-  cacheActiveTightSelection(null);
 }
 
 function startTightDrag(event, image) {
@@ -256,7 +208,6 @@ function startTightDrag(event, image) {
   image.style.left = `${left}px`;
   image.style.top = `${top}px`;
   image.draggable = false;
-  cacheActiveTightSelection(image);
   event.preventDefault();
 }
 
@@ -275,7 +226,6 @@ function stopTightDrag(event) {
     const top = Number.parseFloat(dragState.image.style.top || '0');
     storeTightAnchorPosition(dragState.image, anchor, left, top);
     applyTightAnchorPosition(dragState.image);
-    cacheActiveTightSelection(dragState.image);
   }
   dragState = null;
 }
@@ -601,41 +551,16 @@ function initImageSizeControls() {
     editorElement.addEventListener('copy', handleEditorCopyCut);
     editorElement.addEventListener('cut', handleEditorCopyCut);
     editorElement.addEventListener('paste', handleEditorPaste);
-    editorElement.addEventListener('input', () => {
-      refreshTightImages();
-      refreshTightCanvases();
-    });
-    const observer = new MutationObserver((records) => {
-      records.forEach((record) => {
-        record.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          if (node.matches?.('canvas[id^="trumbowyg-resizimg-"]')) {
-            if (activeTightSelection) {
-              node.dataset.tightAnchorId = activeTightSelection.anchorId;
-              node.dataset.tightOffsetX = `${activeTightSelection.offsetLeft}`;
-              node.dataset.tightOffsetY = `${activeTightSelection.offsetTop}`;
-              applyTightAnchorPositionToElement(
-                node,
-                activeTightSelection.anchorId,
-                activeTightSelection.offsetLeft,
-                activeTightSelection.offsetTop
-              );
-            }
-          }
-        });
-      });
+    editorElement.addEventListener('input', () => refreshTightImages());
+    const observer = new MutationObserver(() => {
       updateImageSizePanel();
       refreshTightImages();
-      refreshTightCanvases();
     });
     observer.observe(editorElement, { childList: true, subtree: true });
   }
   document.addEventListener('pointermove', handleTightDragMove);
   document.addEventListener('pointerup', stopTightDrag);
-  window.addEventListener('resize', () => {
-    refreshTightImages();
-    refreshTightCanvases();
-  });
+  window.addEventListener('resize', () => refreshTightImages());
 }
 
 newPageBtn.addEventListener('click', () => createPageAt(navItems, navItems.length - 1));
