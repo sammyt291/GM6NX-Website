@@ -18,6 +18,9 @@ let trumbowygInstance = null;
 let selectedImage = null;
 let clipboardImageHtml = null;
 let dragState = null;
+let tightAnchorCounter = 0;
+
+const tightAnchorSelector = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, div';
 
 const fontFamilies = ['Arial', 'Georgia', 'Times New Roman', 'Verdana'];
 
@@ -92,20 +95,102 @@ function getImageOffsetInEditor(image) {
   };
 }
 
+function ensureTightAnchorId(anchor) {
+  if (!anchor) return null;
+  if (!anchor.dataset.tightAnchorId) {
+    tightAnchorCounter += 1;
+    anchor.dataset.tightAnchorId = `tight-anchor-${Date.now()}-${tightAnchorCounter}`;
+  }
+  return anchor.dataset.tightAnchorId;
+}
+
+function getAnchorForImage(image) {
+  if (!image || !editorElement) return editorElement;
+  const anchor = image.closest(tightAnchorSelector);
+  return anchor && editorElement.contains(anchor) ? anchor : editorElement;
+}
+
+function getAnchorFromPoint(event) {
+  if (!editorElement || !event) return editorElement;
+  let anchor = null;
+  const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
+  if (range?.startContainer) {
+    const node = range.startContainer.nodeType === Node.TEXT_NODE
+      ? range.startContainer.parentElement
+      : range.startContainer;
+    anchor = node?.closest?.(tightAnchorSelector);
+  }
+  if (!anchor) {
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    anchor = element?.closest?.(tightAnchorSelector);
+  }
+  if (!anchor || !editorElement.contains(anchor)) {
+    return editorElement;
+  }
+  return anchor;
+}
+
+function storeTightAnchorPosition(image, anchor, left, top) {
+  if (!image || !editorElement) return;
+  const resolvedAnchor = anchor || editorElement;
+  const anchorId = ensureTightAnchorId(resolvedAnchor);
+  const editorRect = editorElement.getBoundingClientRect();
+  const anchorRect = resolvedAnchor.getBoundingClientRect();
+  const offsetLeft = left - (anchorRect.left - editorRect.left + editorElement.scrollLeft);
+  const offsetTop = top - (anchorRect.top - editorRect.top + editorElement.scrollTop);
+  image.dataset.tightAnchorId = anchorId;
+  image.dataset.tightOffsetX = `${offsetLeft}`;
+  image.dataset.tightOffsetY = `${offsetTop}`;
+}
+
+function applyTightAnchorPosition(image) {
+  if (!image || !editorElement) return;
+  const anchorId = image.dataset.tightAnchorId;
+  const anchor = anchorId
+    ? editorElement.querySelector(`[data-tight-anchor-id="${anchorId}"]`)
+    : null;
+  const resolvedAnchor = anchor || getAnchorForImage(image);
+  const editorRect = editorElement.getBoundingClientRect();
+  const anchorRect = resolvedAnchor.getBoundingClientRect();
+  const offsetLeft = Number.parseFloat(image.dataset.tightOffsetX || '0');
+  const offsetTop = Number.parseFloat(image.dataset.tightOffsetY || '0');
+  const left = anchorRect.left - editorRect.left + editorElement.scrollLeft + offsetLeft;
+  const top = anchorRect.top - editorRect.top + editorElement.scrollTop + offsetTop;
+  image.style.position = 'absolute';
+  image.style.left = `${left}px`;
+  image.style.top = `${top}px`;
+  image.draggable = false;
+}
+
+function refreshTightImages() {
+  if (!editorElement) return;
+  const images = editorElement.querySelectorAll('img.image-tight');
+  images.forEach((image) => {
+    if (!image.dataset.tightAnchorId) {
+      const { left, top } = getImageOffsetInEditor(image);
+      storeTightAnchorPosition(image, getAnchorForImage(image), left, top);
+    }
+    applyTightAnchorPosition(image);
+  });
+}
+
 function applyImagePositionChange(value) {
   if (!selectedImage) return;
   if (value === 'tight') {
     selectedImage.classList.add('image-tight');
     const { left, top } = getImageOffsetInEditor(selectedImage);
-    selectedImage.style.position = 'absolute';
-    selectedImage.style.left = `${left}px`;
-    selectedImage.style.top = `${top}px`;
+    storeTightAnchorPosition(selectedImage, getAnchorForImage(selectedImage), left, top);
+    applyTightAnchorPosition(selectedImage);
     return;
   }
   selectedImage.classList.remove('image-tight');
+  selectedImage.removeAttribute('data-tight-anchor-id');
+  selectedImage.removeAttribute('data-tight-offset-x');
+  selectedImage.removeAttribute('data-tight-offset-y');
   selectedImage.style.removeProperty('position');
   selectedImage.style.removeProperty('left');
   selectedImage.style.removeProperty('top');
+  selectedImage.draggable = true;
 }
 
 function startTightDrag(event, image) {
@@ -121,6 +206,7 @@ function startTightDrag(event, image) {
   image.style.position = 'absolute';
   image.style.left = `${left}px`;
   image.style.top = `${top}px`;
+  image.draggable = false;
   event.preventDefault();
 }
 
@@ -132,7 +218,14 @@ function handleTightDragMove(event) {
   dragState.image.style.top = `${dragState.originTop + dy}px`;
 }
 
-function stopTightDrag() {
+function stopTightDrag(event) {
+  if (dragState?.image?.classList.contains('image-tight')) {
+    const anchor = event ? getAnchorFromPoint(event) : getAnchorForImage(dragState.image);
+    const left = Number.parseFloat(dragState.image.style.left || '0');
+    const top = Number.parseFloat(dragState.image.style.top || '0');
+    storeTightAnchorPosition(dragState.image, anchor, left, top);
+    applyTightAnchorPosition(dragState.image);
+  }
   dragState = null;
 }
 
@@ -375,7 +468,9 @@ function handleEditorClick(event) {
     setSelectedImage(image);
     return;
   }
-  if (!event.target.closest('.trumbowyg-resize-handle')) {
+  const resizeHandle = event.target.closest('.trumbowyg-resize-handle');
+  const resizeCanvas = event.target.closest('canvas[id^="trumbowyg-resizimg-"]');
+  if (!resizeHandle && !resizeCanvas) {
     setSelectedImage(null);
   }
 }
@@ -439,20 +534,32 @@ function initImageSizeControls() {
   if (editorElement) {
     editorElement.addEventListener('click', handleEditorClick);
     editorElement.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('.trumbowyg-resize-handle')) return;
       const image = event.target.closest('img');
       if (image && editorElement.contains(image)) {
         setSelectedImage(image);
         startTightDrag(event, image);
       }
     });
+    editorElement.addEventListener('dragstart', (event) => {
+      const image = event.target.closest('img.image-tight');
+      if (image && editorElement.contains(image)) {
+        event.preventDefault();
+      }
+    });
     editorElement.addEventListener('copy', handleEditorCopyCut);
     editorElement.addEventListener('cut', handleEditorCopyCut);
     editorElement.addEventListener('paste', handleEditorPaste);
-    const observer = new MutationObserver(() => updateImageSizePanel());
+    editorElement.addEventListener('input', () => refreshTightImages());
+    const observer = new MutationObserver(() => {
+      updateImageSizePanel();
+      refreshTightImages();
+    });
     observer.observe(editorElement, { childList: true, subtree: true });
   }
   document.addEventListener('pointermove', handleTightDragMove);
   document.addEventListener('pointerup', stopTightDrag);
+  window.addEventListener('resize', () => refreshTightImages());
 }
 
 newPageBtn.addEventListener('click', () => createPageAt(navItems, navItems.length - 1));
