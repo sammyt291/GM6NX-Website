@@ -73,6 +73,7 @@ function updateImageSizePanel() {
 
 function setSelectedImage(image) {
   selectedImage = image;
+  cacheActiveTightSelection(image);
   updateImageSizePanel();
 }
 
