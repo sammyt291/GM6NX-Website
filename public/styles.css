@@ -154,6 +154,7 @@ main {
 
 .page-content {
   line-height: 1.6;
+  position: relative;
 }
 
 .modal-backdrop {
@@ -629,6 +630,11 @@ main {
 .page-content img {
   max-width: 100%;
   height: auto;
+}
+
+.page-content img.image-tight {
+  position: absolute;
+  z-index: 2;
 }
 
 .editor-page .format-mode {

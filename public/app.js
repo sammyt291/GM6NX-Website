@@ -96,6 +96,7 @@ async function loadPage(slug, fallbackTitle) {
     pageContent.innerHTML = data.page.content || '<p>Empty page.</p>';
     prepareHtmlWidgetsForView(pageContent);
     normalizeContentImages(pageContent);
+    applyTightImagePositions(pageContent);
     disableGroupEditing();
   } catch {
     pageTitle.textContent = fallbackTitle || 'GM6NX';
@@ -123,10 +124,35 @@ function createImageBlock(image) {
   return block;
 }
 
+const tightAnchorSelector = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, div';
+
+function applyTightImagePositions(container) {
+  if (!container) return;
+  const containerRect = container.getBoundingClientRect();
+  const images = Array.from(container.querySelectorAll('img.image-tight'));
+  images.forEach((img) => {
+    const anchorId = img.dataset.tightAnchorId;
+    let anchor = anchorId ? container.querySelector(`[data-tight-anchor-id="${anchorId}"]`) : null;
+    if (!anchor) {
+      anchor = img.closest(tightAnchorSelector) || container;
+    }
+    const anchorRect = anchor.getBoundingClientRect();
+    const offsetLeft = Number.parseFloat(img.dataset.tightOffsetX || '0');
+    const offsetTop = Number.parseFloat(img.dataset.tightOffsetY || '0');
+    const left = anchorRect.left - containerRect.left + offsetLeft;
+    const top = anchorRect.top - containerRect.top + offsetTop;
+    img.style.position = 'absolute';
+    img.style.left = `${left}px`;
+    img.style.top = `${top}px`;
+    img.removeAttribute('draggable');
+  });
+}
+
 function normalizeContentImages(container) {
   const images = Array.from(container.querySelectorAll('img'));
   images.forEach((img) => {
     if (img.closest('.html-widget')) return;
+    if (img.classList.contains('image-tight')) return;
     img.removeAttribute('draggable');
     const inlineContext = img.closest(
       'p, span, a, strong, em, b, i, u, small, sup, sub, mark, code, s, del, ins, label'
@@ -369,3 +395,5 @@ loginForm.addEventListener('submit', async (event) => {
     loadPage(defaultPage.slug, defaultPage.title);
   }
 })();
+
+window.addEventListener('resize', () => applyTightImagePositions(pageContent));
