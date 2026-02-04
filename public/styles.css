@@ -249,6 +249,40 @@ main {
   position: relative;
 }
 
+.image-size-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: none;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(17, 20, 27, 0.98);
+  border: 1px solid var(--border);
+  z-index: 5;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+.image-size-panel.is-visible {
+  display: flex;
+}
+
+.image-size-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.image-size-field select {
+  background: #0f1117;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
 .editor-canvas {
   min-height: 420px;
 }

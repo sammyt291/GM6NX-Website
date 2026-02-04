@@ -5,12 +5,17 @@ const savePageBtn = document.getElementById('savePageBtn');
 const imageInput = document.getElementById('imageInput');
 const logoutBtn = document.getElementById('logoutBtn');
 const toast = document.getElementById('toast');
+const imageSizePanel = document.getElementById('imageSizePanel');
+const imageWidthSelect = document.getElementById('imageWidthSelect');
+const imageHeightSelect = document.getElementById('imageHeightSelect');
 
 let pages = [];
 let navItems = [];
 let currentSlug = null;
 let toastTimeout = null;
 let trumbowygInstance = null;
+let selectedImage = null;
+let clipboardImageHtml = null;
 
 const fontFamilies = ['Arial', 'Georgia', 'Times New Roman', 'Verdana'];
 
@@ -36,6 +41,60 @@ function initEditor() {
     removeformatPasted: true,
     semantic: true,
   });
+}
+
+function hasResizeBox() {
+  return !!editorElement?.querySelector('.trumbowyg-resize-box');
+}
+
+function syncImageSizePanel() {
+  if (!selectedImage || !imageWidthSelect || !imageHeightSelect) return;
+  const widthValue = selectedImage.style.width;
+  const heightValue = selectedImage.style.height;
+  imageWidthSelect.value = imageWidthSelect.querySelector(`option[value="${widthValue}"]`)
+    ? widthValue
+    : 'auto';
+  imageHeightSelect.value = imageHeightSelect.querySelector(`option[value="${heightValue}"]`)
+    ? heightValue
+    : 'auto';
+}
+
+function updateImageSizePanel() {
+  if (!imageSizePanel) return;
+  const shouldShow = !!selectedImage && hasResizeBox();
+  imageSizePanel.classList.toggle('is-visible', shouldShow);
+  imageSizePanel.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+  if (shouldShow) {
+    syncImageSizePanel();
+  }
+}
+
+function setSelectedImage(image) {
+  selectedImage = image;
+  updateImageSizePanel();
+}
+
+function applyImageSizeChange(axis, value) {
+  if (!selectedImage) return;
+  if (value === 'auto') {
+    selectedImage.style.removeProperty(axis);
+    return;
+  }
+  selectedImage.style[axis] = value;
+}
+
+function insertHtmlAtCursor(html) {
+  if (!html) return;
+  editorElement?.focus();
+  if (document.queryCommandSupported?.('insertHTML')) {
+    document.execCommand('insertHTML', false, html);
+    return;
+  }
+  if (trumbowygInstance) {
+    trumbowygInstance.trumbowyg('execCmd', { cmd: 'insertHTML', param: html });
+    return;
+  }
+  editorElement?.insertAdjacentHTML('beforeend', html);
 }
 
 async function ensureSession() {
@@ -257,6 +316,78 @@ function handleImageDrop(event) {
   uploadImage(imageFile);
 }
 
+function handleEditorClick(event) {
+  const image = event.target.closest('img');
+  if (image && editorElement.contains(image)) {
+    setSelectedImage(image);
+    return;
+  }
+  if (!event.target.closest('.trumbowyg-resize-handle')) {
+    setSelectedImage(null);
+  }
+}
+
+function handleEditorCopyCut(event) {
+  if (!selectedImage) return;
+  const selection = document.getSelection();
+  if (selection && !selection.isCollapsed && !selection.containsNode(selectedImage, true)) return;
+  const html = selectedImage.outerHTML;
+  clipboardImageHtml = html;
+  event.preventDefault();
+  event.clipboardData?.setData('text/html', html);
+  event.clipboardData?.setData('text/plain', selectedImage.src || '');
+  if (event.type === 'cut') {
+    selectedImage.remove();
+    setSelectedImage(null);
+  }
+}
+
+async function handleEditorPaste(event) {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  const items = Array.from(clipboard.items || []);
+  const imageItem = items.find((item) => item.type.startsWith('image/'));
+  if (imageItem) {
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (file) {
+      await uploadImage(file);
+    }
+    return;
+  }
+  const html = clipboard.getData('text/html');
+  if (html && html.includes('<img')) {
+    event.preventDefault();
+    insertHtmlAtCursor(html);
+    return;
+  }
+  if (clipboardImageHtml) {
+    event.preventDefault();
+    insertHtmlAtCursor(clipboardImageHtml);
+  }
+}
+
+function initImageSizeControls() {
+  if (imageWidthSelect) {
+    imageWidthSelect.addEventListener('change', (event) => {
+      applyImageSizeChange('width', event.target.value);
+    });
+  }
+  if (imageHeightSelect) {
+    imageHeightSelect.addEventListener('change', (event) => {
+      applyImageSizeChange('height', event.target.value);
+    });
+  }
+  if (editorElement) {
+    editorElement.addEventListener('click', handleEditorClick);
+    editorElement.addEventListener('copy', handleEditorCopyCut);
+    editorElement.addEventListener('cut', handleEditorCopyCut);
+    editorElement.addEventListener('paste', handleEditorPaste);
+    const observer = new MutationObserver(() => updateImageSizePanel());
+    observer.observe(editorElement, { childList: true, subtree: true });
+  }
+}
+
 newPageBtn.addEventListener('click', () => createPageAt(navItems, navItems.length - 1));
 savePageBtn.addEventListener('click', savePage);
 
@@ -282,6 +413,7 @@ editorElement.addEventListener('dragover', (event) => {
 
 (async function init() {
   initEditor();
+  initImageSizeControls();
   await ensureSession();
   await loadPages();
 })();

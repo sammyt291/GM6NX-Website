@@ -44,6 +44,28 @@
         </aside>
         <div class="editor-workspace">
           <div class="editor-wrapper">
+            <div id="imageSizePanel" class="image-size-panel" aria-hidden="true">
+              <div class="image-size-field">
+                <label for="imageWidthSelect">Width</label>
+                <select id="imageWidthSelect">
+                  <option value="auto">Auto</option>
+                  <option value="25%">25%</option>
+                  <option value="50%">50%</option>
+                  <option value="75%">75%</option>
+                  <option value="100%">100%</option>
+                </select>
+              </div>
+              <div class="image-size-field">
+                <label for="imageHeightSelect">Height</label>
+                <select id="imageHeightSelect">
+                  <option value="auto">Auto</option>
+                  <option value="25%">25%</option>
+                  <option value="50%">50%</option>
+                  <option value="75%">75%</option>
+                  <option value="100%">100%</option>
+                </select>
+              </div>
+            </div>
             <div id="editor" class="editor-canvas"></div>
           </div>
           <p class="notice">Tip: drop images directly onto the canvas to position them.</p>
